@@ -2,12 +2,13 @@ import { updateEnvelope } from '@documenso/lib/server-only/envelope/update-envel
 
 import { authenticatedProcedure } from '../trpc';
 import {
+  updateEnvelopeMeta,
   ZUpdateEnvelopeRequestSchema,
   ZUpdateEnvelopeResponseSchema,
 } from './update-envelope.types';
 
 export const updateEnvelopeRoute = authenticatedProcedure
-  // .meta(updateEnvelopeTrpcMeta)
+  .meta(updateEnvelopeMeta)
   .input(ZUpdateEnvelopeRequestSchema)
   .output(ZUpdateEnvelopeResponseSchema)
   .mutation(async ({ input, ctx }) => {

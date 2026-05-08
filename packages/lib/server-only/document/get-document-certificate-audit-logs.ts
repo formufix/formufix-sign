@@ -7,9 +7,7 @@ export type GetDocumentCertificateAuditLogsOptions = {
   envelopeId: string;
 };
 
-export const getDocumentCertificateAuditLogs = async ({
-  envelopeId,
-}: GetDocumentCertificateAuditLogsOptions) => {
+export const getDocumentCertificateAuditLogs = async ({ envelopeId }: GetDocumentCertificateAuditLogsOptions) => {
   const rawAuditLogs = await prisma.documentAuditLog.findMany({
     where: {
       envelopeId,
@@ -20,6 +18,7 @@ export const getDocumentCertificateAuditLogs = async ({
           DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_FIELD_INSERTED,
           DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_OPENED,
           DOCUMENT_AUDIT_LOG_TYPE.EMAIL_SENT,
+          DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_SENT,
         ],
       },
     },
@@ -36,6 +35,9 @@ export const getDocumentCertificateAuditLogs = async ({
     ),
     [DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_OPENED]: auditLogs.filter(
       (log) => log.type === DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_OPENED,
+    ),
+    [DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_SENT]: auditLogs.filter(
+      (log) => log.type === DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_SENT,
     ),
     [DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_FIELD_INSERTED]: auditLogs.filter(
       (log) => log.type === DOCUMENT_AUDIT_LOG_TYPE.DOCUMENT_FIELD_INSERTED,

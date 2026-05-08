@@ -1,26 +1,29 @@
-import React, { useMemo } from 'react';
-
 import { Trans } from '@lingui/react/macro';
 import type {
   ColumnDef,
   PaginationState,
+  RowSelectionState,
   Table as TTable,
   Updater,
   VisibilityState,
 } from '@tanstack/react-table';
 import { flexRender, getCoreRowModel, useReactTable } from '@tanstack/react-table';
+import type React from 'react';
+import { useMemo } from 'react';
 
 import { Skeleton } from './skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './table';
 
 export type DataTableChildren<TData> = (_table: TTable<TData>) => React.ReactNode;
 
-export type { ColumnDef as DataTableColumnDef } from '@tanstack/react-table';
+export type { ColumnDef as DataTableColumnDef, RowSelectionState } from '@tanstack/react-table';
 
 export interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   columnVisibility?: VisibilityState;
   data: TData[];
+  onRowClick?: (row: TData) => void;
+  rowClassName?: string;
   perPage?: number;
   currentPage?: number;
   totalPages?: number;
@@ -38,6 +41,10 @@ export interface DataTableProps<TData, TValue> {
     enable: boolean;
     component?: React.ReactNode;
   };
+  enableRowSelection?: boolean;
+  rowSelection?: RowSelectionState;
+  onRowSelectionChange?: (selection: RowSelectionState) => void;
+  getRowId?: (row: TData) => string;
 }
 
 export function DataTable<TData, TValue>({
@@ -52,8 +59,14 @@ export function DataTable<TData, TValue>({
   hasFilters,
   onClearFilters,
   onPaginationChange,
+  onRowClick,
+  rowClassName,
   children,
   emptyState,
+  enableRowSelection,
+  rowSelection,
+  onRowSelectionChange,
+  getRowId,
 }: DataTableProps<TData, TValue>) {
   const pagination = useMemo<PaginationState>(() => {
     if (currentPage !== undefined && perPage !== undefined) {
@@ -81,6 +94,13 @@ export function DataTable<TData, TValue>({
     }
   };
 
+  const onTableRowSelectionChange = (updater: Updater<RowSelectionState>) => {
+    if (onRowSelectionChange) {
+      const newSelection = typeof updater === 'function' ? updater(rowSelection ?? {}) : updater;
+      onRowSelectionChange(newSelection);
+    }
+  };
+
   const table = useReactTable({
     data,
     columns,
@@ -88,10 +108,14 @@ export function DataTable<TData, TValue>({
     state: {
       pagination: manualPagination ? pagination : undefined,
       columnVisibility,
+      rowSelection: rowSelection ?? {},
     },
     manualPagination,
     pageCount: totalPages,
     onPaginationChange: onTablePaginationChange,
+    enableRowSelection,
+    onRowSelectionChange: onTableRowSelectionChange,
+    getRowId,
   });
 
   return (
@@ -104,9 +128,7 @@ export function DataTable<TData, TValue>({
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead key={header.id}>
-                      {header.isPlaceholder
-                        ? null
-                        : flexRender(header.column.columnDef.header, header.getContext())}
+                      {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                     </TableHead>
                   );
                 })}
@@ -116,7 +138,12 @@ export function DataTable<TData, TValue>({
           <TableBody>
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
-                <TableRow key={row.id} data-state={row.getIsSelected() && 'selected'}>
+                <TableRow
+                  key={row.id}
+                  data-state={row.getIsSelected() && 'selected'}
+                  className={rowClassName}
+                  onClick={() => onRowClick?.(row.original)}
+                >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
@@ -151,10 +178,7 @@ export function DataTable<TData, TValue>({
                       </p>
 
                       {hasFilters && onClearFilters !== undefined && (
-                        <button
-                          onClick={() => onClearFilters()}
-                          className="text-foreground mt-1 text-sm"
-                        >
+                        <button onClick={() => onClearFilters()} className="mt-1 text-foreground text-sm">
                           <Trans>Clear filters</Trans>
                         </button>
                       )}

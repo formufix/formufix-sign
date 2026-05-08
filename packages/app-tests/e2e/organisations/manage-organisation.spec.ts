@@ -1,12 +1,11 @@
-import { expect, test } from '@playwright/test';
-
 import { createTeam } from '@documenso/lib/server-only/team/create-team';
 import { nanoid } from '@documenso/lib/universal/id';
 import { seedOrganisationMembers } from '@documenso/prisma/seed/organisations';
 import { seedUser } from '@documenso/prisma/seed/users';
+import { expect, test } from '@playwright/test';
 
 import { apiSignin, apiSignout } from '../fixtures/authentication';
-import { expectTextToBeVisible, expectTextToNotBeVisible } from '../fixtures/generic';
+import { expectTextToBeVisible, expectTextToNotBeVisible, openDropdownMenu } from '../fixtures/generic';
 
 test('[ORGANISATIONS]: create and delete organisation', async ({ page }) => {
   const { user, organisation } = await seedUser({
@@ -25,9 +24,7 @@ test('[ORGANISATIONS]: create and delete organisation', async ({ page }) => {
   await page.waitForURL(`/o/${organisation.url}/settings/general`);
 
   await page.getByRole('button', { name: 'Delete' }).click();
-  await page
-    .getByLabel(`Confirm by typing delete ${organisation.name}`)
-    .fill(`delete ${organisation.name}`);
+  await page.getByLabel(`Confirm by typing delete ${organisation.name}`).fill(`delete ${organisation.name}`);
   await page.getByRole('button', { name: 'Delete' }).click();
 
   await page.waitForURL(`/settings/organisations`);
@@ -134,15 +131,9 @@ test('[ORGANISATIONS]: inherit members', async ({ page }) => {
 
   // Check from admin POV that member counts are correct
   // You should only see the manager/admins from the organisation in this table.
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(managerEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(adminEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(ownerEmail),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(managerEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(adminEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(ownerEmail)).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: memberEmail })).not.toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: memberEmail2 })).not.toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: memberEmail3 })).not.toBeVisible();
@@ -153,31 +144,17 @@ test('[ORGANISATIONS]: inherit members', async ({ page }) => {
   await page.getByRole('option', { name: 'Member 1' }).first().click();
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('button', { name: 'Add Members' }).click();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail)).toBeVisible();
 
   await page.goto(`/t/${teamWithInheritMembers.url}/settings/members`);
 
   // Check from member POV that member counts are correct for inherit members team.
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(managerEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(adminEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(ownerEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail2),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail3),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(managerEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(adminEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(ownerEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail2)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Member' }).getByText(memberEmail3)).toBeVisible();
 
   // Disable inherit mode.
   await page.goto(`/t/${teamWithInheritMembers.url}/settings/groups`);
@@ -187,15 +164,9 @@ test('[ORGANISATIONS]: inherit members', async ({ page }) => {
 
   // Expect the inherited members to disappear
   await page.goto(`/t/${teamWithInheritMembers.url}/settings/members`);
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(managerEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(adminEmail),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(ownerEmail),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(managerEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(adminEmail)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Admin' }).getByText(ownerEmail)).toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: memberEmail })).not.toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: memberEmail2 })).not.toBeVisible();
   await expect(page.getByRole('row').filter({ hasText: memberEmail3 })).not.toBeVisible();
@@ -308,25 +279,21 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Group Name *' }).fill('CUSTOM_GROUP');
   await page.getByRole('combobox').filter({ hasText: 'Organisation Member' }).click();
   await page.getByRole('option', { name: 'Organisation Admin' }).click();
-  await page.getByRole('combobox').filter({ hasText: 'Select members' }).click();
+  await page.getByTestId('group-members-picker').click();
   await page.getByRole('option', { name: 'Member1' }).click();
   await page.getByRole('option', { name: 'Member2' }).click();
   await page.getByRole('option', { name: 'Member3' }).click();
+  // Close the multiselect dropdown so it doesn't overlap the submit button.
+  await page.getByRole('heading', { name: 'Create group' }).click();
   await page.getByTestId('dialog-create-organisation-button').click();
   await expect(page.getByText('Group has been created.').first()).toBeVisible();
 
   await page.goto(`/o/${organisation.url}/settings/members`);
 
   // Confirm org roles have been applied to these members.
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(memberEmail1),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(memberEmail2),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(memberEmail3),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(memberEmail1)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(memberEmail2)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(memberEmail3)).toBeVisible();
 
   // Test updating the group.
   await page.goto(`/o/${organisation.url}/settings/groups`);
@@ -334,8 +301,12 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Group Name *' }).fill('CUSTOM_GROUP_A');
   await page.getByRole('combobox').filter({ hasText: 'Organisation Admin' }).click();
   await page.getByRole('option', { name: 'Organisation Member' }).click();
-  await page.getByRole('combobox').filter({ hasText: 'Member1, Member2, Member3' }).click();
-  await page.getByRole('option', { name: 'Member3' }).click();
+  // Remove Member3 by clicking the X on its chip in the multiselect.
+  await page
+    .getByTestId('group-members-picker')
+    .locator('div', { hasText: /^Member3/ })
+    .getByRole('button', { name: 'Remove' })
+    .click();
   await page.getByRole('button', { name: 'Update' }).click();
   await expect(page.getByText('Group has been updated successfully').first()).toBeVisible();
 
@@ -344,25 +315,21 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   // Create a custom member group with the 3 admins to check that they still get the ADMIN roles.
   await page.getByRole('button', { name: 'Create group' }).click();
   await page.getByRole('textbox', { name: 'Group Name *' }).fill('CUSTOM_GROUP_ADMINS');
-  await page.getByRole('combobox').filter({ hasText: 'Select members' }).click();
+  await page.getByTestId('group-members-picker').click();
   await page.getByRole('option', { name: 'Admin1' }).click();
   await page.getByRole('option', { name: 'Admin2' }).click();
   await page.getByRole('option', { name: 'Admin3' }).click();
+  // Close the multiselect dropdown so it doesn't overlap the submit button.
+  await page.getByRole('heading', { name: 'Create group' }).click();
   await page.getByTestId('dialog-create-organisation-button').click();
   await expect(page.getByText('Group has been created.').first()).toBeVisible();
 
   await page.goto(`/o/${organisation.url}/settings/members`);
 
   // Confirm admins still get admin roles.
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(adminEmail1),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(adminEmail2),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(adminEmail3),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(adminEmail1)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(adminEmail2)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Organisation Admin' }).getByText(adminEmail3)).toBeVisible();
 
   // Create another custom group with 3 members with "ORGANISATION MEMBER" role.
   await page.goto(`/o/${organisation.url}/settings/groups`);
@@ -370,17 +337,21 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   await page.getByRole('textbox', { name: 'Group Name *' }).fill('CUSTOM_GROUP_B');
   await page.getByRole('combobox').filter({ hasText: 'Organisation Member' }).click();
   await page.getByRole('option', { name: 'Organisation Admin' }).click();
-  await page.getByRole('combobox').filter({ hasText: 'Select members' }).click();
+  await page.getByTestId('group-members-picker').click();
   await page.getByRole('option', { name: 'Member4' }).click();
   await page.getByRole('option', { name: 'Member5' }).click();
+  // Close the multiselect dropdown so it doesn't overlap the submit button.
+  await page.getByRole('heading', { name: 'Create group' }).click();
   await page.getByTestId('dialog-create-organisation-button').click();
   await expect(page.getByText('Group has been created.').first()).toBeVisible();
 
   // Assign CUSTOM_GROUP_A to TeamA
   await page.goto(`/t/${teamA}/settings/groups`);
   await page.getByRole('button', { name: 'Add groups' }).click();
-  await page.getByRole('combobox').click();
+  await page.getByTestId('team-groups-picker').click();
   await page.getByRole('option', { name: 'CUSTOM_GROUP_A', exact: true }).click();
+  // Close the multiselect dropdown so it doesn't overlap the Next button.
+  await page.getByRole('heading', { name: 'Add groups' }).click();
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Manager' }).click();
@@ -390,8 +361,10 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   // Assign CUSTOM_GROUP_B to TeamA
   await page.goto(`/t/${teamA}/settings/groups`);
   await page.getByRole('button', { name: 'Add groups' }).click();
-  await page.getByRole('combobox').click();
+  await page.getByTestId('team-groups-picker').click();
   await page.getByRole('option', { name: 'CUSTOM_GROUP_B', exact: true }).click();
+  // Close the multiselect dropdown so it doesn't overlap the Next button.
+  await page.getByRole('heading', { name: 'Add groups' }).click();
   await page.getByRole('button', { name: 'Next' }).click();
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Manager' }).click();
@@ -399,7 +372,9 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   await expect(page.getByText('Team members have been added').first()).toBeVisible();
 
   // Update CUSTOM_GROUP_B
-  await page.getByRole('row', { name: 'CUSTOM_GROUP_B' }).getByRole('button').click();
+  const updateBtn = page.getByRole('row', { name: 'CUSTOM_GROUP_B' }).getByRole('button');
+  await openDropdownMenu(page, updateBtn);
+  await expect(page.getByRole('menuitem', { name: 'Update role' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Update role' }).click();
   await page.getByRole('combobox').click();
   await page.getByRole('option', { name: 'Team Admin' }).click();
@@ -409,7 +384,9 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   await page.reload();
 
   // Delete CUSTOM_GROUP_B
-  await page.getByRole('row', { name: 'CUSTOM_GROUP_B' }).getByRole('button').click();
+  const deleteBtn = page.getByRole('row', { name: 'CUSTOM_GROUP_B' }).getByRole('button');
+  await openDropdownMenu(page, deleteBtn);
+  await expect(page.getByRole('menuitem', { name: 'Remove' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Remove' }).click();
   await page.getByRole('button', { name: 'Delete' }).click();
   await expectTextToBeVisible(page, 'You have successfully removed this group from the team.');
@@ -418,12 +395,8 @@ test('[ORGANISATIONS]: manage groups and members', async ({ page }) => {
   // Navigate to team members and validate members are there.
   await page.goto(`/t/${teamA}/settings/members`);
 
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Manager' }).getByText(memberEmail1),
-  ).toBeVisible();
-  await expect(
-    page.getByRole('row').filter({ hasText: 'Team Manager' }).getByText(memberEmail2),
-  ).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Manager' }).getByText(memberEmail1)).toBeVisible();
+  await expect(page.getByRole('row').filter({ hasText: 'Team Manager' }).getByText(memberEmail2)).toBeVisible();
 
   // Member 1 should see inherit team and teamA
   await apiSignout({ page });
@@ -477,7 +450,9 @@ test('[ORGANISATIONS]: member invites', async ({ page }) => {
   await expect(page.getByText(user2.email)).toBeVisible();
   await expect(page.getByText(user3.email)).toBeVisible();
 
-  await page.getByRole('row', { name: user3.email }).getByRole('button').click();
+  const inviteActionBtn = page.getByRole('row', { name: user3.email }).getByRole('button');
+  await openDropdownMenu(page, inviteActionBtn);
+  await expect(page.getByRole('menuitem', { name: 'Remove' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Remove' }).click();
   await expect(page.getByText('Invitation has been deleted').first()).toBeVisible();
   await expect(page.getByText(user3.email)).not.toBeVisible();
@@ -508,7 +483,9 @@ test('[ORGANISATIONS]: member invites', async ({ page }) => {
   await expect(page.getByText(user.email)).toBeVisible();
   await expect(page.getByText(user2.email)).toBeVisible();
 
-  await page.getByRole('row', { name: user2.email }).getByRole('button').click();
+  const memberActionBtn = page.getByRole('row', { name: user2.email }).getByRole('button');
+  await openDropdownMenu(page, memberActionBtn);
+  await expect(page.getByRole('menuitem', { name: 'Remove' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Remove' }).click();
   await page.getByRole('button', { name: 'Remove' }).click();
   await expect(page.getByText('You have successfully removed').first()).toBeVisible();
@@ -522,7 +499,9 @@ test('[ORGANISATIONS]: member invites', async ({ page }) => {
   await expect(page.getByText(user.email)).toBeVisible();
   await expect(page.getByText(user2.email)).toBeVisible();
 
-  await page.getByRole('row', { name: user2.email }).getByRole('button').click();
+  const orgMemberBtn = page.getByRole('row', { name: user2.email }).getByRole('button');
+  await openDropdownMenu(page, orgMemberBtn);
+  await expect(page.getByRole('menuitem', { name: 'Remove' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Remove' }).click();
   await page.getByRole('button', { name: 'Delete' }).click();
   await expect(page.getByText('You have successfully removed this user').first()).toBeVisible();
@@ -558,8 +537,6 @@ test('[ORGANISATIONS]: leave organisation', async ({ page }) => {
   await page.getByRole('button', { name: 'Leave' }).click();
   await page.getByRole('button', { name: 'Leave' }).click();
 
-  await expect(
-    page.getByText('You have successfully left this organisation').first(),
-  ).toBeVisible();
+  await expect(page.getByText('You have successfully left this organisation').first()).toBeVisible();
   await expect(page.getByText('No results found').first()).toBeVisible();
 });

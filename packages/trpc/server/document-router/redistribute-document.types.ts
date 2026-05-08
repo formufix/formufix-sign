@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
+import { ZSuccessResponseSchema } from '../schema';
 import type { TrpcRouteMeta } from '../trpc';
-import { ZSuccessResponseSchema } from './schema';
 
 export const redistributeDocumentMeta: TrpcRouteMeta = {
   openapi: {
@@ -16,10 +16,7 @@ export const redistributeDocumentMeta: TrpcRouteMeta = {
 
 export const ZRedistributeDocumentRequestSchema = z.object({
   documentId: z.number(),
-  recipients: z
-    .array(z.number())
-    .min(1)
-    .describe('The IDs of the recipients to redistribute the document to.'),
+  recipients: z.array(z.number()).min(1).describe('The IDs of the recipients to redistribute the document to.'),
 });
 
 export const ZRedistributeDocumentResponseSchema = ZSuccessResponseSchema;

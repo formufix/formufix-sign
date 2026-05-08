@@ -1,8 +1,3 @@
-import type { Session } from '@prisma/client';
-import type { Context } from 'hono';
-import type { Logger } from 'pino';
-import { z } from 'zod';
-
 import type { SessionUser } from '@documenso/auth/server/lib/session/session';
 import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session';
 import type { RootApiLog } from '@documenso/lib/types/api-logs';
@@ -11,19 +6,21 @@ import { alphaid } from '@documenso/lib/universal/id';
 import { logger } from '@documenso/lib/utils/logger';
 // This is a bit nasty. Todo: Extract
 import type { HonoEnv } from '@documenso/remix/server/router';
+import type { Session } from '@prisma/client';
+import type { Context } from 'hono';
+import type { Logger } from 'pino';
+import { z } from 'zod';
 
 type CreateTrpcContextOptions = {
   c: Context<HonoEnv>;
   requestSource: 'app' | 'apiV1' | 'apiV2';
 };
 
-export const createTrpcContext = async ({
-  c,
-  requestSource,
-}: CreateTrpcContextOptions): Promise<TrpcContext> => {
+export const createTrpcContext = async ({ c, requestSource }: CreateTrpcContextOptions): Promise<TrpcContext> => {
   const { session, user } = await getOptionalSession(c);
 
   const req = c.req.raw;
+  const res = c.res;
 
   const requestMetadata = c.get('context').requestMetadata;
 
@@ -54,6 +51,7 @@ export const createTrpcContext = async ({
       user: null,
       teamId,
       req,
+      res,
       metadata,
     };
   }
@@ -64,6 +62,7 @@ export const createTrpcContext = async ({
     user,
     teamId,
     req,
+    res,
     metadata,
   };
 };
@@ -80,6 +79,7 @@ export type TrpcContext = (
 ) & {
   teamId: number | undefined;
   req: Request;
+  res: Response;
   metadata: ApiRequestMetadata;
   logger: Logger;
 };

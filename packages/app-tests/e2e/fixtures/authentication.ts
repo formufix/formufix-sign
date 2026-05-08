@@ -1,6 +1,5 @@
-import { type Page } from '@playwright/test';
-
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
+import type { Page } from '@playwright/test';
 
 type LoginOptions = {
   page: Page;
@@ -57,4 +56,16 @@ const getCsrfToken = async (page: Page) => {
   }
 
   return csrfToken;
+};
+
+export const checkSessionValid = async (page: Page): Promise<boolean> => {
+  const { request } = page.context();
+
+  const response = await request.fetch(`${NEXT_PUBLIC_WEBAPP_URL()}/api/auth/session`, {
+    method: 'get',
+  });
+
+  const session = await response.json();
+
+  return session.isAuthenticated === true;
 };

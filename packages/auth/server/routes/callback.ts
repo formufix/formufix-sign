@@ -1,8 +1,7 @@
+import { AppError } from '@documenso/lib/errors/app-error';
 import { Hono } from 'hono';
 
-import { AppError } from '@documenso/lib/errors/app-error';
-
-import { GoogleAuthOptions, OidcAuthOptions } from '../config';
+import { GoogleAuthOptions, MicrosoftAuthOptions, OidcAuthOptions } from '../config';
 import { handleOAuthCallbackUrl } from '../lib/utils/handle-oauth-callback-url';
 import { handleOAuthOrganisationCallbackUrl } from '../lib/utils/handle-oauth-organisation-callback-url';
 import type { HonoAuthContext } from '../types/context';
@@ -45,4 +44,9 @@ export const callbackRoute = new Hono<HonoAuthContext>()
   /**
    * Google callback verification.
    */
-  .get('/google', async (c) => handleOAuthCallbackUrl({ c, clientOptions: GoogleAuthOptions }));
+  .get('/google', async (c) => handleOAuthCallbackUrl({ c, clientOptions: GoogleAuthOptions }))
+
+  /**
+   * Microsoft callback verification.
+   */
+  .get('/microsoft', async (c) => handleOAuthCallbackUrl({ c, clientOptions: MicrosoftAuthOptions }));

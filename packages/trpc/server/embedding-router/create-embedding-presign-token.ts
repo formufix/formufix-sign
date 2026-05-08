@@ -6,9 +6,9 @@ import { getApiTokenByToken } from '@documenso/lib/server-only/public-api/get-ap
 
 import { procedure } from '../trpc';
 import {
+  createEmbeddingPresignTokenMeta,
   ZCreateEmbeddingPresignTokenRequestSchema,
   ZCreateEmbeddingPresignTokenResponseSchema,
-  createEmbeddingPresignTokenMeta,
 } from './create-embedding-presign-token.types';
 
 /**
@@ -29,7 +29,7 @@ export const createEmbeddingPresignTokenRoute = procedure
         });
       }
 
-      const { expiresIn } = input;
+      const { expiresIn, scope } = input;
 
       if (IS_BILLING_ENABLED()) {
         const token = await getApiTokenByToken({ token: apiToken });
@@ -46,7 +46,7 @@ export const createEmbeddingPresignTokenRoute = procedure
 
         if (!organisationClaim.flags.embedAuthoring) {
           throw new AppError(AppErrorCode.UNAUTHORIZED, {
-            message: 'You do not have permission to create embedding presign tokens',
+            message: 'Embedded Authoring is not included in your current plan. Please contact support.',
           });
         }
       }
@@ -54,6 +54,7 @@ export const createEmbeddingPresignTokenRoute = procedure
       const presignToken = await createEmbeddingPresignToken({
         apiToken,
         expiresIn,
+        scope,
       });
 
       return { ...presignToken };

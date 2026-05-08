@@ -2,11 +2,13 @@ import { duplicateEnvelope } from '@documenso/lib/server-only/envelope/duplicate
 
 import { authenticatedProcedure } from '../trpc';
 import {
+  duplicateEnvelopeMeta,
   ZDuplicateEnvelopeRequestSchema,
   ZDuplicateEnvelopeResponseSchema,
 } from './duplicate-envelope.types';
 
 export const duplicateEnvelopeRoute = authenticatedProcedure
+  .meta(duplicateEnvelopeMeta)
   .input(ZDuplicateEnvelopeRequestSchema)
   .output(ZDuplicateEnvelopeResponseSchema)
   .mutation(async ({ input, ctx }) => {
@@ -29,6 +31,6 @@ export const duplicateEnvelopeRoute = authenticatedProcedure
     });
 
     return {
-      duplicatedEnvelopeId: duplicatedEnvelope.id,
+      id: duplicatedEnvelope.id,
     };
   });

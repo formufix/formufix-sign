@@ -1,8 +1,7 @@
-import { EnvelopeType } from '@prisma/client';
-import { match } from 'ts-pattern';
-
 import { setDocumentRecipients } from '@documenso/lib/server-only/recipient/set-document-recipients';
 import { setTemplateRecipients } from '@documenso/lib/server-only/recipient/set-template-recipients';
+import { EnvelopeType } from '@prisma/client';
+import { match } from 'ts-pattern';
 
 import { authenticatedProcedure } from '../trpc';
 import {
@@ -23,7 +22,7 @@ export const setEnvelopeRecipientsRoute = authenticatedProcedure
       },
     });
 
-    return await match(envelopeType)
+    const { recipients: data } = await match(envelopeType)
       .with(EnvelopeType.DOCUMENT, async () =>
         setDocumentRecipients({
           userId: ctx.user.id,
@@ -48,4 +47,8 @@ export const setEnvelopeRecipientsRoute = authenticatedProcedure
         }),
       )
       .exhaustive();
+
+    return {
+      data,
+    };
   });

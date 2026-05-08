@@ -1,16 +1,10 @@
-import { DocumentSource, EnvelopeType, SubscriptionStatus } from '@prisma/client';
-import { DateTime } from 'luxon';
-
 import { IS_BILLING_ENABLED } from '@documenso/lib/constants/app';
 import { INTERNAL_CLAIM_ID } from '@documenso/lib/types/subscription';
 import { prisma } from '@documenso/prisma';
+import { DocumentSource, EnvelopeType, SubscriptionStatus } from '@prisma/client';
+import { DateTime } from 'luxon';
 
-import {
-  FREE_PLAN_LIMITS,
-  INACTIVE_PLAN_LIMITS,
-  PAID_PLAN_LIMITS,
-  SELFHOSTED_PLAN_LIMITS,
-} from './constants';
+import { FREE_PLAN_LIMITS, INACTIVE_PLAN_LIMITS, PAID_PLAN_LIMITS, SELFHOSTED_PLAN_LIMITS } from './constants';
 import { ERROR_CODES } from './errors';
 import type { TLimitsResponseSchema } from './schema';
 
@@ -19,17 +13,7 @@ export type GetServerLimitsOptions = {
   teamId: number;
 };
 
-export const getServerLimits = async ({
-  userId,
-  teamId,
-}: GetServerLimitsOptions): Promise<TLimitsResponseSchema> => {
-  if (!IS_BILLING_ENABLED()) {
-    return {
-      quota: SELFHOSTED_PLAN_LIMITS,
-      remaining: SELFHOSTED_PLAN_LIMITS,
-    };
-  }
-
+export const getServerLimits = async ({ userId, teamId }: GetServerLimitsOptions): Promise<TLimitsResponseSchema> => {
   const organisation = await prisma.organisation.findFirst({
     where: {
       teams: {
@@ -57,20 +41,31 @@ export const getServerLimits = async ({
   const remaining = structuredClone(FREE_PLAN_LIMITS);
 
   const subscription = organisation.subscription;
+  const maximumEnvelopeItemCount = organisation.organisationClaim.envelopeItemCount;
+
+  if (!IS_BILLING_ENABLED()) {
+    return {
+      quota: SELFHOSTED_PLAN_LIMITS,
+      remaining: SELFHOSTED_PLAN_LIMITS,
+      maximumEnvelopeItemCount,
+    };
+  }
 
   // Bypass all limits even if plan expired for ENTERPRISE.
   if (organisation.organisationClaimId === INTERNAL_CLAIM_ID.ENTERPRISE) {
     return {
       quota: PAID_PLAN_LIMITS,
       remaining: PAID_PLAN_LIMITS,
+      maximumEnvelopeItemCount,
     };
   }
 
   // Early return for users with an expired subscription.
-  if (subscription && subscription.status !== SubscriptionStatus.ACTIVE) {
+  if (subscription && subscription.status === SubscriptionStatus.INACTIVE) {
     return {
       quota: INACTIVE_PLAN_LIMITS,
       remaining: INACTIVE_PLAN_LIMITS,
+      maximumEnvelopeItemCount,
     };
   }
 
@@ -80,6 +75,7 @@ export const getServerLimits = async ({
     return {
       quota: PAID_PLAN_LIMITS,
       remaining: PAID_PLAN_LIMITS,
+      maximumEnvelopeItemCount,
     };
   }
 
@@ -117,5 +113,6 @@ export const getServerLimits = async ({
   return {
     quota,
     remaining,
+    maximumEnvelopeItemCount,
   };
 };

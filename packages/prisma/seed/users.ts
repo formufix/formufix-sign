@@ -1,8 +1,7 @@
-import { OrganisationType, Role } from '@prisma/client';
-import { customAlphabet } from 'nanoid';
-
 import { hashSync } from '@documenso/lib/server-only/auth/hash';
 import { createPersonalOrganisation } from '@documenso/lib/server-only/organisation/create-organisation';
+import { OrganisationType, Role } from '@prisma/client';
+import { customAlphabet } from 'nanoid';
 
 import { prisma } from '..';
 import { setOrganisationType } from './organisations';
@@ -60,6 +59,18 @@ export const seedUser = async ({
     },
     include: {
       teams: true,
+      organisationClaim: true,
+    },
+  });
+
+  await prisma.organisationClaim.update({
+    where: {
+      id: organisation.organisationClaim.id,
+    },
+    data: {
+      flags: {
+        allowLegacyEnvelopes: true,
+      },
     },
   });
 

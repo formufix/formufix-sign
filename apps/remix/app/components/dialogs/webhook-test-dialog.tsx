@@ -1,14 +1,3 @@
-import { useState } from 'react';
-
-import { zodResolver } from '@hookform/resolvers/zod';
-import { msg } from '@lingui/core/macro';
-import { useLingui } from '@lingui/react';
-import { Trans } from '@lingui/react/macro';
-import type { Webhook } from '@prisma/client';
-import { WebhookTriggerEvents } from '@prisma/client';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-
 import { toFriendlyWebhookEventName } from '@documenso/lib/universal/webhook/to-friendly-webhook-event-name';
 import { trpc } from '@documenso/trpc/react';
 import { Button } from '@documenso/ui/primitives/button';
@@ -21,24 +10,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@documenso/ui/primitives/dialog';
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from '@documenso/ui/primitives/form/form';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@documenso/ui/primitives/select';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@documenso/ui/primitives/form/form';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@documenso/ui/primitives/select';
 import { useToast } from '@documenso/ui/primitives/use-toast';
-
-import { useCurrentTeam } from '~/providers/team';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Trans, useLingui } from '@lingui/react/macro';
+import type { Webhook } from '@prisma/client';
+import { WebhookTriggerEvents } from '@prisma/client';
+import { useState } from 'react';
+import { useForm } from 'react-hook-form';
+import { z } from 'zod';
 
 export type WebhookTestDialogProps = {
   webhook: Pick<Webhook, 'id' | 'webhookUrl' | 'eventTriggers'>;
@@ -52,10 +33,8 @@ const ZTestWebhookFormSchema = z.object({
 type TTestWebhookFormSchema = z.infer<typeof ZTestWebhookFormSchema>;
 
 export const WebhookTestDialog = ({ webhook, children }: WebhookTestDialogProps) => {
-  const { _ } = useLingui();
+  const { t } = useLingui();
   const { toast } = useToast();
-
-  const team = useCurrentTeam();
 
   const [open, setOpen] = useState(false);
 
@@ -73,22 +52,19 @@ export const WebhookTestDialog = ({ webhook, children }: WebhookTestDialogProps)
       await testWebhook({
         id: webhook.id,
         event,
-        teamId: team.id,
       });
 
       toast({
-        title: _(msg`Test webhook sent`),
-        description: _(msg`The test webhook has been successfully sent to your endpoint.`),
+        title: t`Test webhook sent`,
+        description: t`The test webhook has been successfully sent to your endpoint.`,
         duration: 5000,
       });
 
       setOpen(false);
     } catch (error) {
       toast({
-        title: _(msg`Test webhook failed`),
-        description: _(
-          msg`We encountered an error while sending the test webhook. Please check your endpoint and try again.`,
-        ),
+        title: t`Test webhook failed`,
+        description: t`We encountered an error while sending the test webhook. Please check your endpoint and try again.`,
         variant: 'destructive',
         duration: 5000,
       });
@@ -106,18 +82,13 @@ export const WebhookTestDialog = ({ webhook, children }: WebhookTestDialogProps)
           </DialogTitle>
 
           <DialogDescription>
-            <Trans>
-              Send a test webhook with sample data to verify your integration is working correctly.
-            </Trans>
+            <Trans>Send a test webhook with sample data to verify your integration is working correctly.</Trans>
           </DialogDescription>
         </DialogHeader>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)}>
-            <fieldset
-              className="flex h-full flex-col space-y-4"
-              disabled={form.formState.isSubmitting}
-            >
+            <fieldset className="flex h-full flex-col space-y-4" disabled={form.formState.isSubmitting}>
               <FormField
                 control={form.control}
                 name="event"
@@ -129,7 +100,7 @@ export const WebhookTestDialog = ({ webhook, children }: WebhookTestDialogProps)
                     <Select onValueChange={field.onChange} value={field.value}>
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Select an event type" />
+                          <SelectValue placeholder={t`Select an event type`} />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -146,19 +117,19 @@ export const WebhookTestDialog = ({ webhook, children }: WebhookTestDialogProps)
               />
 
               <div className="rounded-md border p-4">
-                <h4 className="mb-2 text-sm font-medium">
+                <h4 className="mb-2 font-medium text-sm">
                   <Trans>Webhook URL</Trans>
                 </h4>
-                <p className="text-muted-foreground break-all text-sm">{webhook.webhookUrl}</p>
+                <p className="break-all text-muted-foreground text-sm">{webhook.webhookUrl}</p>
               </div>
 
               <DialogFooter>
                 <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-                  <Trans>Cancel</Trans>
+                  <Trans>Close</Trans>
                 </Button>
 
                 <Button type="submit" loading={form.formState.isSubmitting}>
-                  <Trans>Send Test Webhook</Trans>
+                  <Trans>Send</Trans>
                 </Button>
               </DialogFooter>
             </fieldset>

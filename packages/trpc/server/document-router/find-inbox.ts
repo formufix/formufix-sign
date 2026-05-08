@@ -1,10 +1,9 @@
-import type { Envelope, Prisma } from '@prisma/client';
-import { DocumentStatus, EnvelopeType, RecipientRole } from '@prisma/client';
-
 import type { FindResultResponse } from '@documenso/lib/types/search-params';
 import { mapEnvelopesToDocumentMany } from '@documenso/lib/utils/document';
 import { maskRecipientTokensForDocument } from '@documenso/lib/utils/mask-recipient-tokens-for-document';
 import { prisma } from '@documenso/prisma';
+import type { Envelope, Prisma } from '@prisma/client';
+import { DocumentStatus, EnvelopeType, RecipientRole } from '@prisma/client';
 
 import { authenticatedProcedure } from '../trpc';
 import { ZFindInboxRequestSchema, ZFindInboxResponseSchema } from './find-inbox.types';
@@ -90,6 +89,14 @@ export const findInbox = async ({ userId, page = 1, perPage = 10, orderBy }: Fin
           select: {
             id: true,
             url: true,
+          },
+        },
+        envelopeItems: {
+          select: {
+            id: true,
+            envelopeId: true,
+            title: true,
+            order: true,
           },
         },
       },

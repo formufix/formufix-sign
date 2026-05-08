@@ -1,8 +1,16 @@
+import { getSession } from '@documenso/auth/server/lib/utils/get-session';
+import { LicenseClient } from '@documenso/lib/server-only/license/license-client';
+import { isAdmin } from '@documenso/lib/utils/is-admin';
+import { cn } from '@documenso/ui/lib/utils';
+import { Button } from '@documenso/ui/primitives/button';
+import { msg } from '@lingui/core/macro';
 import { Trans } from '@lingui/react/macro';
 import {
+  AlertTriangleIcon,
   BarChart3,
   Building2Icon,
   FileStack,
+  MailIcon,
   Settings,
   Trophy,
   Users,
@@ -10,27 +18,38 @@ import {
 } from 'lucide-react';
 import { Link, Outlet, redirect, useLocation } from 'react-router';
 
-import { getSession } from '@documenso/auth/server/lib/utils/get-session';
-import { isAdmin } from '@documenso/lib/utils/is-admin';
-import { cn } from '@documenso/ui/lib/utils';
-import { Button } from '@documenso/ui/primitives/button';
+import { AdminLicenseStatusBanner } from '~/components/general/admin-license-status-banner';
+import { appMetaTags } from '~/utils/meta';
 
 import type { Route } from './+types/_layout';
+
+export function meta() {
+  return appMetaTags(msg`Admin`);
+}
 
 export async function loader({ request }: Route.LoaderArgs) {
   const { user } = await getSession(request);
 
+  const license = await LicenseClient.getInstance()?.getCachedLicense();
+
   if (!user || !isAdmin(user)) {
     throw redirect('/');
   }
+
+  return {
+    license: license || null,
+  };
 }
 
-export default function AdminLayout() {
+export default function AdminLayout({ loaderData }: Route.ComponentProps) {
+  const { license } = loaderData;
   const { pathname } = useLocation();
 
   return (
     <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
-      <h1 className="text-4xl font-semibold">
+      <AdminLicenseStatusBanner license={license} />
+
+      <h1 className="font-semibold text-4xl">
         <Trans>Admin Panel</Trans>
       </h1>
 
@@ -42,10 +61,7 @@ export default function AdminLayout() {
         >
           <Button
             variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/stats') && 'bg-secondary',
-            )}
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/stats') && 'bg-secondary')}
             asChild
           >
             <Link to="/admin/stats">
@@ -56,10 +72,7 @@ export default function AdminLayout() {
 
           <Button
             variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/organisations') && 'bg-secondary',
-            )}
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/organisations') && 'bg-secondary')}
             asChild
           >
             <Link to="/admin/organisations">
@@ -70,10 +83,7 @@ export default function AdminLayout() {
 
           <Button
             variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/claims') && 'bg-secondary',
-            )}
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/claims') && 'bg-secondary')}
             asChild
           >
             <Link to="/admin/claims">
@@ -84,10 +94,7 @@ export default function AdminLayout() {
 
           <Button
             variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/users') && 'bg-secondary',
-            )}
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/users') && 'bg-secondary')}
             asChild
           >
             <Link to="/admin/users">
@@ -98,10 +105,7 @@ export default function AdminLayout() {
 
           <Button
             variant="ghost"
-            className={cn(
-              'justify-start md:w-full',
-              pathname?.startsWith('/admin/documents') && 'bg-secondary',
-            )}
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/documents') && 'bg-secondary')}
             asChild
           >
             <Link to="/admin/documents">
@@ -114,13 +118,24 @@ export default function AdminLayout() {
             variant="ghost"
             className={cn(
               'justify-start md:w-full',
-              pathname?.startsWith('/admin/leaderboard') && 'bg-secondary',
+              pathname?.startsWith('/admin/unsealed-documents') && 'bg-secondary',
             )}
             asChild
           >
-            <Link to="/admin/leaderboard">
-              <Trophy className="mr-2 h-5 w-5" />
-              <Trans>Leaderboard</Trans>
+            <Link to="/admin/unsealed-documents">
+              <AlertTriangleIcon className="mr-2 h-5 w-5" />
+              <Trans>Unsealed Documents</Trans>
+            </Link>
+          </Button>
+
+          <Button
+            variant="ghost"
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/email-domains') && 'bg-secondary')}
+            asChild
+          >
+            <Link to="/admin/email-domains">
+              <MailIcon className="mr-2 h-5 w-5" />
+              <Trans>Email Domains</Trans>
             </Link>
           </Button>
 
@@ -128,8 +143,19 @@ export default function AdminLayout() {
             variant="ghost"
             className={cn(
               'justify-start md:w-full',
-              pathname?.startsWith('/admin/banner') && 'bg-secondary',
+              pathname?.startsWith('/admin/organisation-insights') && 'bg-secondary',
             )}
+            asChild
+          >
+            <Link to="/admin/organisation-insights">
+              <Trophy className="mr-2 h-5 w-5" />
+              <Trans>Organisation Insights</Trans>
+            </Link>
+          </Button>
+
+          <Button
+            variant="ghost"
+            className={cn('justify-start md:w-full', pathname?.startsWith('/admin/site-settings') && 'bg-secondary')}
             asChild
           >
             <Link to="/admin/site-settings">

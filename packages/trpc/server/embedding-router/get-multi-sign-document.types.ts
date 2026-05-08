@@ -1,11 +1,11 @@
-import { z } from 'zod';
-
 import { ZDocumentLiteSchema } from '@documenso/lib/types/document';
 import { ZRecipientLiteSchema } from '@documenso/lib/types/recipient';
 import DocumentDataSchema from '@documenso/prisma/generated/zod/modelSchema/DocumentDataSchema';
 import DocumentMetaSchema from '@documenso/prisma/generated/zod/modelSchema/DocumentMetaSchema';
+import EnvelopeItemSchema from '@documenso/prisma/generated/zod/modelSchema/EnvelopeItemSchema';
 import FieldSchema from '@documenso/prisma/generated/zod/modelSchema/FieldSchema';
 import SignatureSchema from '@documenso/prisma/generated/zod/modelSchema/SignatureSchema';
+import { z } from 'zod';
 
 export const ZGetMultiSignDocumentRequestSchema = z.object({
   token: z.string().min(1, { message: 'Token is required' }),
@@ -40,9 +40,11 @@ export const ZGetMultiSignDocumentResponseSchema = ZDocumentLiteSchema.extend({
       signature: SignatureSchema.nullable(),
     }),
   ),
+  envelopeItems: EnvelopeItemSchema.pick({
+    id: true,
+    envelopeId: true,
+  }).array(),
 });
 
 export type TGetMultiSignDocumentRequestSchema = z.infer<typeof ZGetMultiSignDocumentRequestSchema>;
-export type TGetMultiSignDocumentResponseSchema = z.infer<
-  typeof ZGetMultiSignDocumentResponseSchema
->;
+export type TGetMultiSignDocumentResponseSchema = z.infer<typeof ZGetMultiSignDocumentResponseSchema>;

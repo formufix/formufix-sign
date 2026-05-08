@@ -171,15 +171,20 @@ git clone https://github.com/<your-username>/documenso
 
 5. Create the database schema by running `npm run prisma:migrate-dev`
 
-6. Run `npm run dev` in the root directory to start
+6. Run `npm run translate:compile` in the root directory to compile lingui
 
-7. Register a new user at http://localhost:3000/signup
+7. Run `npm run dev` in the root directory to start
+
+8. Register a new user at http://localhost:3000/signup
 
 ---
 
 - Optional: Seed the database using `npm run prisma:seed -w @documenso/prisma` to create a test user and document.
 - Optional: Create your own signing certificate.
   - To generate your own using these steps and a Linux Terminal or Windows Subsystem for Linux (WSL), see **[Create your own signing certificate](./SIGNING.md)**.
+- Optional: Configure job provider for document reminders.
+  - The default local job provider does not support scheduled jobs required for document reminders.
+  - To enable reminders, set `NEXT_PRIVATE_JOBS_PROVIDER=inngest` and provide `NEXT_PRIVATE_INNGEST_EVENT_KEY` in your `.env` file.
 
 ### Run in Gitpod
 

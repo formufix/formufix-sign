@@ -1,6 +1,5 @@
-import { EnvelopeType } from '@prisma/client';
-
 import { prisma } from '@documenso/prisma';
+import { EnvelopeType } from '@prisma/client';
 
 import { AppError, AppErrorCode } from '../../errors/app-error';
 import { mapSecondaryIdToTemplateId } from '../../utils/envelope';
@@ -9,9 +8,7 @@ export interface GetTemplateByDirectLinkTokenOptions {
   token: string;
 }
 
-export const getTemplateByDirectLinkToken = async ({
-  token,
-}: GetTemplateByDirectLinkTokenOptions) => {
+export const getTemplateByDirectLinkToken = async ({ token }: GetTemplateByDirectLinkTokenOptions) => {
   const envelope = await prisma.envelope.findFirst({
     where: {
       type: EnvelopeType.TEMPLATE,
@@ -38,7 +35,6 @@ export const getTemplateByDirectLinkToken = async ({
 
   const directLink = envelope?.directLink;
 
-  // Todo: Envelopes
   const firstDocumentData = envelope?.envelopeItems[0]?.documentData;
 
   // Doing this to enforce type safety for directLink.
@@ -88,5 +84,10 @@ export const getTemplateByDirectLinkToken = async ({
     },
     recipients: recipientsWithMappedFields,
     fields: recipientsWithMappedFields.flatMap((recipient) => recipient.fields),
+    envelopeItems: envelope.envelopeItems.map((item) => ({
+      id: item.id,
+      envelopeId: item.envelopeId,
+      documentDataId: item.documentDataId,
+    })),
   };
 };

@@ -1,16 +1,17 @@
+import { ZEnvelopeSchema } from '@documenso/lib/types/envelope';
 import { z } from 'zod';
 
-import { ZEnvelopeSchema } from '@documenso/lib/types/envelope';
+import type { TrpcRouteMeta } from '../trpc';
 
-// export const getEnvelopeMeta: TrpcRouteMeta = {
-//   openapi: {
-//     method: 'GET',
-//     path: '/envelope/{envelopeId}',
-//     summary: 'Get envelope',
-//     description: 'Returns a envelope given an ID',
-//     tags: ['Envelope'],
-//   },
-// };
+export const getEnvelopeMeta: TrpcRouteMeta = {
+  openapi: {
+    method: 'GET',
+    path: '/envelope/{envelopeId}',
+    summary: 'Get envelope',
+    description: 'Returns an envelope given an ID',
+    tags: ['Envelope'],
+  },
+};
 
 export const ZGetEnvelopeRequestSchema = z.object({
   envelopeId: z.string(),

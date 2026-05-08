@@ -1,10 +1,3 @@
-import { Trans } from '@lingui/react/macro';
-import { DocumentSigningOrder, DocumentStatus, RecipientRole, SigningStatus } from '@prisma/client';
-import { Clock8 } from 'lucide-react';
-import { Link, redirect } from 'react-router';
-import { getOptionalLoaderContext } from 'server/utils/get-loader-session';
-import { match } from 'ts-pattern';
-
 import signingCelebration from '@documenso/assets/images/signing-celebration.png';
 import { getOptionalSession } from '@documenso/auth/server/lib/utils/get-session';
 import { EnvelopeRenderProvider } from '@documenso/lib/client-only/providers/envelope-render-provider';
@@ -25,8 +18,15 @@ import { getTeamSettings } from '@documenso/lib/server-only/team/get-team-settin
 import { getUserByEmail } from '@documenso/lib/server-only/user/get-user-by-email';
 import { DocumentAccessAuth } from '@documenso/lib/types/document-auth';
 import { extractDocumentAuthMethods } from '@documenso/lib/utils/document-auth';
+import { isRecipientExpired } from '@documenso/lib/utils/recipients';
 import { prisma } from '@documenso/prisma';
 import { SigningCard3D } from '@documenso/ui/components/signing-card';
+import { Trans } from '@lingui/react/macro';
+import { DocumentSigningOrder, DocumentStatus, RecipientRole, SigningStatus } from '@prisma/client';
+import { Clock8 } from 'lucide-react';
+import { Link, redirect } from 'react-router';
+import { getOptionalLoaderContext } from 'server/utils/get-loader-session';
+import { match } from 'ts-pattern';
 
 import { Header as AuthenticatedHeader } from '~/components/general/app-header';
 import { DocumentSigningAuthPageView } from '~/components/general/document-signing/document-signing-auth-page';
@@ -61,12 +61,7 @@ const handleV1Loader = async ({ params, request }: Route.LoaderArgs) => {
     getCompletedFieldsForToken({ token }),
   ]);
 
-  if (
-    !document ||
-    !document.documentData ||
-    !recipient ||
-    document.status === DocumentStatus.DRAFT
-  ) {
+  if (!document || !document.documentData || !recipient || document.status === DocumentStatus.DRAFT) {
     throw new Response('Not Found', { status: 404 });
   }
 
@@ -140,16 +135,20 @@ const handleV1Loader = async ({ params, request }: Route.LoaderArgs) => {
     throw redirect(`/sign/${token}/rejected`);
   }
 
-  if (
-    document.status === DocumentStatus.COMPLETED ||
-    recipient.signingStatus === SigningStatus.SIGNED
-  ) {
+  if (isRecipientExpired(recipient)) {
+    throw redirect(`/sign/${token}/expired`);
+  }
+
+  if (document.status === DocumentStatus.COMPLETED || recipient.signingStatus === SigningStatus.SIGNED) {
     throw redirect(documentMeta?.redirectUrl || `/sign/${token}/complete`);
   }
 
-  const [recipientSignature] = await getRecipientSignatures({ recipientId: recipient.id });
+  const [recipientSignatures, settings] = await Promise.all([
+    getRecipientSignatures({ recipientId: recipient.id }),
+    getTeamSettings({ teamId: document.teamId }),
+  ]);
 
-  const settings = await getTeamSettings({ teamId: document.teamId });
+  const [recipientSignature] = recipientSignatures;
 
   return {
     isDocumentAccessValid: true,
@@ -201,7 +200,7 @@ const handleV2Loader = async ({ params, request }: Route.LoaderArgs) => {
     return envelopeForSigning;
   }
 
-  const { envelope, recipient, isCompleted, isRejected, isRecipientsTurn } = envelopeForSigning;
+  const { envelope, recipient, isCompleted, isRejected, isExpired, isRecipientsTurn } = envelopeForSigning;
 
   if (!isRecipientsTurn) {
     throw redirect(`/sign/${token}/waiting`);
@@ -233,12 +232,6 @@ const handleV2Loader = async ({ params, request }: Route.LoaderArgs) => {
     } as const;
   }
 
-  await viewedDocument({
-    token,
-    requestMetadata,
-    recipientAccessAuth: derivedRecipientAccessAuth,
-  }).catch(() => null);
-
   if (isRejected) {
     throw redirect(`/sign/${token}/rejected`);
   }
@@ -246,6 +239,16 @@ const handleV2Loader = async ({ params, request }: Route.LoaderArgs) => {
   if (isCompleted) {
     throw redirect(envelope.documentMeta.redirectUrl || `/sign/${token}/complete`);
   }
+
+  if (isExpired) {
+    throw redirect(`/sign/${token}/expired`);
+  }
+
+  await viewedDocument({
+    token,
+    requestMetadata,
+    recipientAccessAuth: derivedRecipientAccessAuth,
+  }).catch(() => null);
 
   return {
     isDocumentAccessValid: true,
@@ -311,12 +314,7 @@ const SigningPageV1 = ({ data }: { data: Awaited<ReturnType<typeof handleV1Loade
   const user = sessionData?.user;
 
   if (!data.isDocumentAccessValid) {
-    return (
-      <DocumentSigningAuthPageView
-        email={data.recipientEmail}
-        emailHasAccount={!!data.recipientHasAccount}
-      />
-    );
+    return <DocumentSigningAuthPageView email={data.recipientEmail} emailHasAccount={!!data.recipientHasAccount} />;
   }
 
   const {
@@ -348,31 +346,29 @@ const SigningPageV1 = ({ data }: { data: Awaited<ReturnType<typeof handleV1Loade
             </span>
           </div>
 
-          <h2 className="mt-6 max-w-[35ch] text-center text-2xl font-semibold leading-normal md:text-3xl lg:text-4xl">
+          <h2 className="mt-6 max-w-[35ch] text-center font-semibold text-2xl leading-normal md:text-3xl lg:text-4xl">
             <Trans>
               <span className="mt-1.5 block">"{document.title}"</span>
               is no longer available to sign
             </Trans>
           </h2>
 
-          <p className="text-muted-foreground/60 mt-2.5 max-w-[60ch] text-center text-sm font-medium md:text-base">
+          <p className="mt-2.5 max-w-[60ch] text-center font-medium text-muted-foreground/60 text-sm md:text-base">
             <Trans>This document has been cancelled by the owner.</Trans>
           </p>
 
           {user ? (
-            <Link to="/" className="text-documenso-700 hover:text-documenso-600 mt-36">
+            <Link to="/" className="mt-36 text-documenso-700 hover:text-documenso-600">
               <Trans>Go Back Home</Trans>
             </Link>
           ) : (
-            <p className="text-muted-foreground/60 mt-36 text-sm">
+            <p className="mt-36 text-muted-foreground/60 text-sm">
               <Trans>
                 Want to send slick signing links like this one?{' '}
-                <Link
-                  to="https://documenso.com"
-                  className="text-documenso-700 hover:text-documenso-600"
-                >
-                  Check out Documenso.
+                <Link to="https://documenso.com" className="text-documenso-700 hover:text-documenso-600">
+                  Check out Documenso
                 </Link>
+                .
               </Trans>
             </p>
           )}
@@ -390,26 +386,20 @@ const SigningPageV1 = ({ data }: { data: Awaited<ReturnType<typeof handleV1Loade
       uploadSignatureEnabled={document.documentMeta?.uploadSignatureEnabled}
       drawSignatureEnabled={document.documentMeta?.drawSignatureEnabled}
     >
-      <DocumentSigningAuthProvider
-        documentAuthOptions={document.authOptions}
-        recipient={recipient}
-        user={user}
-      >
-        <>
-          {sessionData?.user && <AuthenticatedHeader />}
+      <DocumentSigningAuthProvider documentAuthOptions={document.authOptions} recipient={recipient} user={user}>
+        {sessionData?.user && <AuthenticatedHeader />}
 
-          <div className="mb-8 mt-8 px-4 md:mb-12 md:mt-12 md:px-8">
-            <DocumentSigningPageViewV1
-              recipient={recipientWithFields}
-              document={document}
-              fields={fields}
-              completedFields={completedFields}
-              isRecipientsTurn={isRecipientsTurn}
-              allRecipients={allRecipients}
-              includeSenderDetails={includeSenderDetails}
-            />
-          </div>
-        </>
+        <div className="mt-8 mb-8 px-4 md:mt-12 md:mb-12 md:px-8">
+          <DocumentSigningPageViewV1
+            recipient={recipientWithFields}
+            document={document}
+            fields={fields}
+            completedFields={completedFields}
+            isRecipientsTurn={isRecipientsTurn}
+            allRecipients={allRecipients}
+            includeSenderDetails={includeSenderDetails}
+          />
+        </div>
       </DocumentSigningAuthProvider>
     </DocumentSigningProvider>
   );
@@ -420,12 +410,7 @@ const SigningPageV2 = ({ data }: { data: Awaited<ReturnType<typeof handleV2Loade
   const user = sessionData?.user;
 
   if (!data.isDocumentAccessValid) {
-    return (
-      <DocumentSigningAuthPageView
-        email={data.recipientEmail}
-        emailHasAccount={!!data.recipientHasAccount}
-      />
-    );
+    return <DocumentSigningAuthPageView email={data.recipientEmail} emailHasAccount={!!data.recipientHasAccount} />;
   }
 
   const { envelope, recipientSignature, recipient } = data.envelopeForSigning;
@@ -447,31 +432,29 @@ const SigningPageV2 = ({ data }: { data: Awaited<ReturnType<typeof handleV2Loade
             </span>
           </div>
 
-          <h2 className="mt-6 max-w-[35ch] text-center text-2xl font-semibold leading-normal md:text-3xl lg:text-4xl">
+          <h2 className="mt-6 max-w-[35ch] text-center font-semibold text-2xl leading-normal md:text-3xl lg:text-4xl">
             <Trans>
               <span className="mt-1.5 block">"{envelope.title}"</span>
               is no longer available to sign
             </Trans>
           </h2>
 
-          <p className="text-muted-foreground/60 mt-2.5 max-w-[60ch] text-center text-sm font-medium md:text-base">
+          <p className="mt-2.5 max-w-[60ch] text-center font-medium text-muted-foreground/60 text-sm md:text-base">
             <Trans>This document has been cancelled by the owner.</Trans>
           </p>
 
           {user ? (
-            <Link to="/" className="text-documenso-700 hover:text-documenso-600 mt-36">
+            <Link to="/" className="mt-36 text-documenso-700 hover:text-documenso-600">
               <Trans>Go Back Home</Trans>
             </Link>
           ) : (
-            <p className="text-muted-foreground/60 mt-36 text-sm">
+            <p className="mt-36 text-muted-foreground/60 text-sm">
               <Trans>
                 Want to send slick signing links like this one?{' '}
-                <Link
-                  to="https://documenso.com"
-                  className="text-documenso-700 hover:text-documenso-600"
-                >
-                  Check out Documenso.
+                <Link to="https://documenso.com" className="text-documenso-700 hover:text-documenso-600">
+                  Check out Documenso
                 </Link>
+                .
               </Trans>
             </p>
           )}
@@ -487,12 +470,13 @@ const SigningPageV2 = ({ data }: { data: Awaited<ReturnType<typeof handleV2Loade
       fullName={user?.email === recipient.email ? user?.name : recipient.name}
       signature={user?.email === recipient.email ? user?.signature : undefined}
     >
-      <DocumentSigningAuthProvider
-        documentAuthOptions={envelope.authOptions}
-        recipient={recipient}
-        user={user}
-      >
-        <EnvelopeRenderProvider envelope={envelope}>
+      <DocumentSigningAuthProvider documentAuthOptions={envelope.authOptions} recipient={recipient} user={user}>
+        <EnvelopeRenderProvider
+          version="current"
+          envelope={envelope}
+          envelopeItems={envelope.envelopeItems}
+          token={recipient.token}
+        >
           <DocumentSigningPageViewV2 />
         </EnvelopeRenderProvider>
       </DocumentSigningAuthProvider>

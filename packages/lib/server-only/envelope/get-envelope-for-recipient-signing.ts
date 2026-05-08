@@ -1,19 +1,18 @@
-import { DocumentSigningOrder, DocumentStatus, EnvelopeType, SigningStatus } from '@prisma/client';
-import { z } from 'zod';
-
 import { prisma } from '@documenso/prisma';
-import DocumentDataSchema from '@documenso/prisma/generated/zod/modelSchema/DocumentDataSchema';
 import DocumentMetaSchema from '@documenso/prisma/generated/zod/modelSchema/DocumentMetaSchema';
 import EnvelopeItemSchema from '@documenso/prisma/generated/zod/modelSchema/EnvelopeItemSchema';
 import EnvelopeSchema from '@documenso/prisma/generated/zod/modelSchema/EnvelopeSchema';
 import SignatureSchema from '@documenso/prisma/generated/zod/modelSchema/SignatureSchema';
 import TeamSchema from '@documenso/prisma/generated/zod/modelSchema/TeamSchema';
 import UserSchema from '@documenso/prisma/generated/zod/modelSchema/UserSchema';
+import { DocumentSigningOrder, DocumentStatus, EnvelopeType, SigningStatus } from '@prisma/client';
+import { z } from 'zod';
 
 import { AppError, AppErrorCode } from '../../errors/app-error';
 import type { TDocumentAuthMethods } from '../../types/document-auth';
-import { ZFieldSchema } from '../../types/field';
+import { ZEnvelopeFieldSchema, ZFieldSchema } from '../../types/field';
 import { ZRecipientLiteSchema } from '../../types/recipient';
+import { isRecipientExpired } from '../../utils/recipients';
 import { isRecipientAuthorized } from '../document/is-recipient-authorized';
 import { getTeamSettings } from '../team/get-team-settings';
 
@@ -23,7 +22,7 @@ export type GetRecipientEnvelopeByTokenOptions = {
   accessAuth?: TDocumentAuthMethods;
 };
 
-const ZEnvelopeForSigningResponse = z.object({
+export const ZEnvelopeForSigningResponse = z.object({
   envelope: EnvelopeSchema.pick({
     type: true,
     status: true,
@@ -31,6 +30,7 @@ const ZEnvelopeForSigningResponse = z.object({
     secondaryId: true,
     internalVersion: true,
     completedAt: true,
+    updatedAt: true,
     deletedAt: true,
     title: true,
     authOptions: true,
@@ -56,35 +56,31 @@ const ZEnvelopeForSigningResponse = z.object({
       email: true,
       name: true,
       documentDeletedAt: true,
-      expired: true,
+      expired: true, //!: deprecated Not in use. To be removed in a future migration.
+      expiresAt: true,
+      expirationNotifiedAt: true,
       signedAt: true,
       authOptions: true,
       signingOrder: true,
       rejectionReason: true,
     })
       .extend({
-        fields: ZFieldSchema.omit({
-          documentId: true,
-          templateId: true,
+        fields: ZEnvelopeFieldSchema.extend({
+          signature: SignatureSchema.pick({
+            signatureImageAsBase64: true,
+            typedSignature: true,
+          }).nullish(),
         }).array(),
       })
       .array(),
 
     envelopeItems: EnvelopeItemSchema.pick({
+      envelopeId: true,
       id: true,
       title: true,
-      documentDataId: true,
       order: true,
-    })
-      .extend({
-        documentData: DocumentDataSchema.pick({
-          type: true,
-          id: true,
-          data: true,
-          initialData: true,
-        }),
-      })
-      .array(),
+      documentDataId: true,
+    }).array(),
 
     team: TeamSchema.pick({
       id: true,
@@ -109,13 +105,15 @@ const ZEnvelopeForSigningResponse = z.object({
     email: true,
     name: true,
     documentDeletedAt: true,
-    expired: true,
+    expiresAt: true,
+    expirationNotifiedAt: true,
     signedAt: true,
     authOptions: true,
     token: true,
     signingOrder: true,
     rejectionReason: true,
   }).extend({
+    directToken: z.string().nullish(),
     fields: ZFieldSchema.omit({
       documentId: true,
       templateId: true,
@@ -132,6 +130,7 @@ const ZEnvelopeForSigningResponse = z.object({
 
   isCompleted: z.boolean(),
   isRejected: z.boolean(),
+  isExpired: z.boolean(),
   isRecipientsTurn: z.boolean(),
 
   sender: z.object({
@@ -198,11 +197,7 @@ export const getEnvelopeForRecipientSigning = async ({
           signingOrder: 'asc',
         },
       },
-      envelopeItems: {
-        include: {
-          documentData: true,
-        },
-      },
+      envelopeItems: true,
       team: {
         select: {
           id: true,
@@ -268,10 +263,7 @@ export const getEnvelopeForRecipientSigning = async ({
 
   const currentRecipientIndex = envelope.recipients.findIndex((r) => r.token === token);
 
-  if (
-    envelope.documentMeta.signingOrder === DocumentSigningOrder.SEQUENTIAL &&
-    currentRecipientIndex !== -1
-  ) {
+  if (envelope.documentMeta.signingOrder === DocumentSigningOrder.SEQUENTIAL && currentRecipientIndex !== -1) {
     for (let i = 0; i < currentRecipientIndex; i++) {
       if (envelope.recipients[i].signingStatus !== SigningStatus.SIGNED) {
         isRecipientsTurn = false;
@@ -295,12 +287,9 @@ export const getEnvelopeForRecipientSigning = async ({
     recipient,
     recipientSignature,
     isRecipientsTurn,
-    isCompleted:
-      recipient.signingStatus === SigningStatus.SIGNED ||
-      envelope.status === DocumentStatus.COMPLETED,
-    isRejected:
-      recipient.signingStatus === SigningStatus.REJECTED ||
-      envelope.status === DocumentStatus.REJECTED,
+    isCompleted: recipient.signingStatus === SigningStatus.SIGNED || envelope.status === DocumentStatus.COMPLETED,
+    isRejected: recipient.signingStatus === SigningStatus.REJECTED || envelope.status === DocumentStatus.REJECTED,
+    isExpired: isRecipientExpired(recipient),
     sender,
     settings: {
       includeSenderDetails: settings.includeSenderDetails,

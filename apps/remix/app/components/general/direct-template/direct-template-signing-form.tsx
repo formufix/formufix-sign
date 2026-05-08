@@ -1,11 +1,3 @@
-import { useEffect, useMemo, useState } from 'react';
-
-import { Trans } from '@lingui/react/macro';
-import type { Field, Recipient, Signature } from '@prisma/client';
-import { FieldType } from '@prisma/client';
-import { DateTime } from 'luxon';
-import { match } from 'ts-pattern';
-
 import { DEFAULT_DOCUMENT_DATE_FORMAT } from '@documenso/lib/constants/date-formats';
 import { PDF_VIEWER_PAGE_SELECTOR } from '@documenso/lib/constants/pdf-viewer';
 import { DEFAULT_DOCUMENT_TIME_ZONE } from '@documenso/lib/constants/time-zones';
@@ -37,6 +29,12 @@ import { Input } from '@documenso/ui/primitives/input';
 import { Label } from '@documenso/ui/primitives/label';
 import { SignaturePadDialog } from '@documenso/ui/primitives/signature-pad/signature-pad-dialog';
 import { useStep } from '@documenso/ui/primitives/stepper';
+import { Trans } from '@lingui/react/macro';
+import type { Field, Recipient, Signature } from '@prisma/client';
+import { FieldType } from '@prisma/client';
+import { DateTime } from 'luxon';
+import { useEffect, useMemo, useState } from 'react';
+import { match } from 'ts-pattern';
 
 import { DocumentSigningCheckboxField } from '~/components/general/document-signing/document-signing-checkbox-field';
 import { DocumentSigningCompleteDialog } from '~/components/general/document-signing/document-signing-complete-dialog';
@@ -55,10 +53,10 @@ import { DocumentSigningRecipientProvider } from '../document-signing/document-s
 
 export type DirectTemplateSigningFormProps = {
   flowStep: DocumentFlowStep;
-  directRecipient: Pick<Recipient, 'authOptions' | 'email' | 'role' | 'name' | 'token'>;
+  directRecipient: Pick<Recipient, 'authOptions' | 'email' | 'role' | 'name' | 'token' | 'id'>;
   directRecipientFields: Field[];
   template: Omit<TTemplate, 'user'>;
-  onSubmit: (_data: DirectTemplateLocalField[]) => Promise<void>;
+  onSubmit: (_data: DirectTemplateLocalField[], _nextSigner?: { name: string; email: string }) => Promise<void>;
 };
 
 export type DirectTemplateLocalField = Field & {
@@ -78,8 +76,6 @@ export const DirectTemplateSigningForm = ({
   const [localFields, setLocalFields] = useState<DirectTemplateLocalField[]>(directRecipientFields);
   const [validateUninsertedFields, setValidateUninsertedFields] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const highestPageNumber = Math.max(...localFields.map((field) => field.page));
 
   const fieldsRequiringValidation = useMemo(() => {
     return localFields.filter((field) => isFieldUnsignedAndRequired(field));
@@ -149,7 +145,7 @@ export const DirectTemplateSigningForm = ({
     validateFieldsInserted(fieldsRequiringValidation);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (nextSigner?: { name: string; email: string }) => {
     setValidateUninsertedFields(true);
 
     const isFieldsValid = validateFieldsInserted(fieldsRequiringValidation);
@@ -161,7 +157,7 @@ export const DirectTemplateSigningForm = ({
     setIsSubmitting(true);
 
     try {
-      await onSubmit(localFields);
+      await onSubmit(localFields, nextSigner);
     } catch {
       setIsSubmitting(false);
     }
@@ -218,14 +214,44 @@ export const DirectTemplateSigningForm = ({
     setLocalFields(updatedFields);
   }, []);
 
+  const nextRecipient = useMemo(() => {
+    if (
+      !template.templateMeta?.signingOrder ||
+      template.templateMeta.signingOrder !== 'SEQUENTIAL' ||
+      !template.templateMeta.allowDictateNextSigner
+    ) {
+      return undefined;
+    }
+
+    const sortedRecipients = template.recipients.sort((a, b) => {
+      // Sort by signingOrder first (nulls last), then by id
+      if (a.signingOrder === null && b.signingOrder === null) {
+        return a.id - b.id;
+      }
+      if (a.signingOrder === null) {
+        return 1;
+      }
+      if (b.signingOrder === null) {
+        return -1;
+      }
+      if (a.signingOrder === b.signingOrder) {
+        return a.id - b.id;
+      }
+      return a.signingOrder - b.signingOrder;
+    });
+
+    const currentIndex = sortedRecipients.findIndex((r) => r.id === directRecipient.id);
+    return currentIndex !== -1 && currentIndex < sortedRecipients.length - 1
+      ? sortedRecipients[currentIndex + 1]
+      : undefined;
+  }, [template.templateMeta?.signingOrder, template.recipients, directRecipient.id]);
+
   return (
     <DocumentSigningRecipientProvider recipient={directRecipient}>
       <DocumentFlowFormContainerHeader title={flowStep.title} description={flowStep.description} />
 
       <DocumentFlowFormContainerContent>
-        <ElementVisible
-          target={`${PDF_VIEWER_PAGE_SELECTOR}[data-page-number="${highestPageNumber}"]`}
-        >
+        <ElementVisible target={PDF_VIEWER_PAGE_SELECTOR}>
           {validateUninsertedFields && uninsertedFields[0] && (
             <FieldToolTip key={uninsertedFields[0].id} field={uninsertedFields[0]} color="warning">
               <Trans>Click to insert field</Trans>
@@ -280,9 +306,7 @@ export const DirectTemplateSigningForm = ({
                 />
               ))
               .with(FieldType.TEXT, () => {
-                const parsedFieldMeta = field.fieldMeta
-                  ? ZTextFieldMeta.parse(field.fieldMeta)
-                  : null;
+                const parsedFieldMeta = field.fieldMeta ? ZTextFieldMeta.parse(field.fieldMeta) : null;
 
                 return (
                   <DocumentSigningTextField
@@ -297,9 +321,7 @@ export const DirectTemplateSigningForm = ({
                 );
               })
               .with(FieldType.NUMBER, () => {
-                const parsedFieldMeta = field.fieldMeta
-                  ? ZNumberFieldMeta.parse(field.fieldMeta)
-                  : null;
+                const parsedFieldMeta = field.fieldMeta ? ZNumberFieldMeta.parse(field.fieldMeta) : null;
 
                 return (
                   <DocumentSigningNumberField
@@ -314,9 +336,7 @@ export const DirectTemplateSigningForm = ({
                 );
               })
               .with(FieldType.DROPDOWN, () => {
-                const parsedFieldMeta = field.fieldMeta
-                  ? ZDropdownFieldMeta.parse(field.fieldMeta)
-                  : null;
+                const parsedFieldMeta = field.fieldMeta ? ZDropdownFieldMeta.parse(field.fieldMeta) : null;
 
                 return (
                   <DocumentSigningDropdownField
@@ -331,9 +351,7 @@ export const DirectTemplateSigningForm = ({
                 );
               })
               .with(FieldType.RADIO, () => {
-                const parsedFieldMeta = field.fieldMeta
-                  ? ZRadioFieldMeta.parse(field.fieldMeta)
-                  : null;
+                const parsedFieldMeta = field.fieldMeta ? ZRadioFieldMeta.parse(field.fieldMeta) : null;
 
                 return (
                   <DocumentSigningRadioField
@@ -348,9 +366,7 @@ export const DirectTemplateSigningForm = ({
                 );
               })
               .with(FieldType.CHECKBOX, () => {
-                const parsedFieldMeta = field.fieldMeta
-                  ? ZCheckboxFieldMeta.parse(field.fieldMeta)
-                  : null;
+                const parsedFieldMeta = field.fieldMeta ? ZCheckboxFieldMeta.parse(field.fieldMeta) : null;
 
                 return (
                   <DocumentSigningCheckboxField
@@ -375,11 +391,7 @@ export const DirectTemplateSigningForm = ({
                 <Trans>Full Name</Trans>
               </Label>
 
-              <Input
-                id="full-name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value.trimStart())}
-              />
+              <Input id="full-name" value={fullName} onChange={(e) => setFullName(e.target.value.trimStart())} />
             </div>
 
             <div>
@@ -390,6 +402,7 @@ export const DirectTemplateSigningForm = ({
               <SignaturePadDialog
                 className="mt-2"
                 disabled={isSubmitting}
+                fullName={fullName}
                 value={signature ?? ''}
                 onChange={(value) => setSignature(value)}
                 typedSignatureEnabled={template.templateMeta?.typedSignatureEnabled}
@@ -406,7 +419,7 @@ export const DirectTemplateSigningForm = ({
 
         <div className="mt-4 flex gap-x-4">
           <Button
-            className="dark:bg-muted dark:hover:bg-muted/80 w-full bg-black/5 hover:bg-black/10"
+            className="w-full bg-black/5 hover:bg-black/10 dark:bg-muted dark:hover:bg-muted/80"
             size="lg"
             variant="secondary"
             disabled={isSubmitting}
@@ -417,11 +430,13 @@ export const DirectTemplateSigningForm = ({
 
           <DocumentSigningCompleteDialog
             isSubmitting={isSubmitting}
-            onSignatureComplete={async () => handleSubmit()}
+            onSignatureComplete={async (nextSigner) => handleSubmit(nextSigner)}
             documentTitle={template.title}
             fields={localFields}
             fieldsValidated={fieldsValidated}
             recipient={directRecipient}
+            allowDictateNextSigner={nextRecipient && template.templateMeta?.allowDictateNextSigner}
+            defaultNextSigner={nextRecipient ? { name: nextRecipient.name, email: nextRecipient.email } : undefined}
           />
         </div>
       </DocumentFlowFormContainerFooter>

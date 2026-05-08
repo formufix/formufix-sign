@@ -1,6 +1,5 @@
-import { Trans } from '@lingui/react/macro';
-
 import { findUsers } from '@documenso/lib/server-only/user/get-all-users';
+import { Trans } from '@lingui/react/macro';
 
 import { AdminOrganisationWithUserCreateDialog } from '~/components/dialogs/admin-organisation-with-user-create-dialog';
 import { AdminDashboardUsersTable } from '~/components/tables/admin-dashboard-users-table';
@@ -14,9 +13,7 @@ export async function loader({ request }: Route.LoaderArgs) {
   const perPage = Number(url.searchParams.get('perPage')) || 10;
   const search = url.searchParams.get('search') || '';
 
-  const [{ users, totalPages }] = await Promise.all([
-    findUsers({ username: search, email: search, page, perPage }),
-  ]);
+  const [{ users, totalPages }] = await Promise.all([findUsers({ username: search, email: search, page, perPage })]);
 
   return {
     users,
@@ -32,18 +29,13 @@ export default function AdminManageUsersPage({ loaderData }: Route.ComponentProp
   return (
     <div>
       <div className="mb-6 flex items-center justify-between">
-        <h2 className="text-4xl font-semibold">
+        <h2 className="font-semibold text-4xl">
           <Trans>Manage users</Trans>
         </h2>
         <AdminOrganisationWithUserCreateDialog />
       </div>
 
-      <AdminDashboardUsersTable
-        users={users}
-        totalPages={totalPages}
-        page={page}
-        perPage={perPage}
-      />
+      <AdminDashboardUsersTable users={users} totalPages={totalPages} page={page} perPage={perPage} />
     </div>
   );
 }

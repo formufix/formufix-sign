@@ -20,14 +20,13 @@ import {
   SigningStatus,
 } from '../client';
 
-const examplePdf = fs
-  .readFileSync(path.join(__dirname, '../../../assets/example.pdf'))
-  .toString('base64');
+const examplePdf = fs.readFileSync(path.join(__dirname, '../../../assets/example.pdf')).toString('base64');
 
 type SeedTemplateOptions = {
   title?: string;
   userId: number;
   teamId: number;
+  internalVersion?: 1 | 2;
   createTemplateOptions?: Partial<Prisma.EnvelopeUncheckedCreateInput>;
 };
 
@@ -36,11 +35,7 @@ type CreateTemplateOptions = {
   createTemplateOptions?: Partial<Prisma.EnvelopeUncheckedCreateInput>;
 };
 
-export const seedBlankTemplate = async (
-  owner: User,
-  teamId: number,
-  options: CreateTemplateOptions = {},
-) => {
+export const seedBlankTemplate = async (owner: User, teamId: number, options: CreateTemplateOptions = {}) => {
   const { key, createTemplateOptions = {} } = options;
 
   const documentData = await prisma.documentData.create({
@@ -109,7 +104,7 @@ export const seedTemplate = async (options: SeedTemplateOptions) => {
     data: {
       id: prefixedId('envelope'),
       secondaryId: templateId.formattedTemplateId,
-      internalVersion: 1,
+      internalVersion: options.internalVersion ?? 1,
       type: EnvelopeType.TEMPLATE,
       title,
       envelopeItems: {
@@ -142,6 +137,7 @@ export const seedTemplate = async (options: SeedTemplateOptions) => {
           documentData: true,
         },
       },
+      recipients: true,
     },
   });
 };
@@ -167,7 +163,7 @@ export const seedDirectTemplate = async (options: SeedTemplateOptions) => {
     data: {
       id: prefixedId('envelope'),
       secondaryId: templateId.formattedTemplateId,
-      internalVersion: 1,
+      internalVersion: options.internalVersion ?? 1,
       type: EnvelopeType.TEMPLATE,
       title,
       envelopeItems: {
@@ -184,6 +180,7 @@ export const seedDirectTemplate = async (options: SeedTemplateOptions) => {
       teamId,
       recipients: {
         create: {
+          signingOrder: 1,
           email: DIRECT_TEMPLATE_RECIPIENT_EMAIL,
           name: DIRECT_TEMPLATE_RECIPIENT_NAME,
           token: Math.random().toString().slice(2, 7),

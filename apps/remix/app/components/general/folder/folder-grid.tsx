@@ -1,23 +1,23 @@
-import { useState } from 'react';
-
+import { useCurrentOrganisation } from '@documenso/lib/client-only/providers/organisation';
+import { formatDocumentsPath, formatTemplatesPath } from '@documenso/lib/utils/teams';
+import { trpc } from '@documenso/trpc/react';
+import type { TFolderWithSubfolders } from '@documenso/trpc/server/folder-router/schema';
+import { Skeleton } from '@documenso/ui/primitives/skeleton';
 import { Trans } from '@lingui/react/macro';
 import { FolderType } from '@prisma/client';
 import { FolderIcon, HomeIcon } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router';
-
-import { formatDocumentsPath, formatTemplatesPath } from '@documenso/lib/utils/teams';
-import { trpc } from '@documenso/trpc/react';
-import { type TFolderWithSubfolders } from '@documenso/trpc/server/folder-router/schema';
-import { Skeleton } from '@documenso/ui/primitives/skeleton';
 
 import { FolderCreateDialog } from '~/components/dialogs/folder-create-dialog';
 import { FolderDeleteDialog } from '~/components/dialogs/folder-delete-dialog';
 import { FolderMoveDialog } from '~/components/dialogs/folder-move-dialog';
 import { FolderUpdateDialog } from '~/components/dialogs/folder-update-dialog';
-import { TemplateCreateDialog } from '~/components/dialogs/template-create-dialog';
-import { DocumentUploadButton } from '~/components/general/document/document-upload-button';
+import { DocumentUploadButtonLegacy } from '~/components/general/document/document-upload-button-legacy';
 import { FolderCard, FolderCardEmpty } from '~/components/general/folder/folder-card';
 import { useCurrentTeam } from '~/providers/team';
+
+import { EnvelopeUploadButton } from '../envelope/envelope-upload-button';
 
 export type FolderGridProps = {
   type: FolderType;
@@ -26,6 +26,7 @@ export type FolderGridProps = {
 
 export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
   const team = useCurrentTeam();
+  const organisation = useCurrentOrganisation();
 
   const [isMovingFolder, setIsMovingFolder] = useState(false);
   const [folderToMove, setFolderToMove] = useState<TFolderWithSubfolders | null>(null);
@@ -34,32 +35,29 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
   const [isSettingsFolderOpen, setIsSettingsFolderOpen] = useState(false);
   const [folderToSettings, setFolderToSettings] = useState<TFolderWithSubfolders | null>(null);
 
-  const { mutateAsync: pinFolder } = trpc.folder.pinFolder.useMutation();
-  const { mutateAsync: unpinFolder } = trpc.folder.unpinFolder.useMutation();
-
   const { data: foldersData, isPending } = trpc.folder.getFolders.useQuery({
     type,
     parentId,
   });
 
   const formatBreadCrumbPath = (folderId: string) => {
-    const rootPath =
-      type === FolderType.DOCUMENT ? formatDocumentsPath(team.url) : formatTemplatesPath(team.url);
+    const rootPath = type === FolderType.DOCUMENT ? formatDocumentsPath(team.url) : formatTemplatesPath(team.url);
 
     return `${rootPath}/f/${folderId}`;
   };
 
   const formatViewAllFoldersPath = () => {
-    const rootPath =
-      type === FolderType.DOCUMENT ? formatDocumentsPath(team.url) : formatTemplatesPath(team.url);
+    const rootPath = type === FolderType.DOCUMENT ? formatDocumentsPath(team.url) : formatTemplatesPath(team.url);
+
+    if (parentId) {
+      return `${rootPath}/folders?parentId=${parentId}`;
+    }
 
     return `${rootPath}/folders`;
   };
 
   const formatRootPath = () => {
-    return type === FolderType.DOCUMENT
-      ? formatDocumentsPath(team.url)
-      : formatTemplatesPath(team.url);
+    return type === FolderType.DOCUMENT ? formatDocumentsPath(team.url) : formatTemplatesPath(team.url);
   };
 
   const pinnedFolders = foldersData?.folders.filter((folder) => folder.pinned) || [];
@@ -69,7 +67,7 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
     <div>
       <div className="mb-4 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
         <div
-          className="text-muted-foreground hover:text-muted-foreground/80 flex flex-1 items-center text-sm font-medium"
+          className="flex flex-1 items-center font-medium text-muted-foreground text-sm hover:text-muted-foreground/80"
           data-testid="folder-grid-breadcrumbs"
         >
           <Link to={formatRootPath()} className="flex items-center">
@@ -97,14 +95,10 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
         </div>
 
         <div className="flex gap-4 sm:flex-row sm:justify-end">
-          {/* Todo: Envelopes - Feature flag */}
-          {/* <EnvelopeUploadButton type={type} folderId={parentId || undefined} /> */}
+          <EnvelopeUploadButton type={type} folderId={parentId || undefined} />
 
-          {type === FolderType.DOCUMENT ? (
-            <DocumentUploadButton />
-          ) : (
-            <TemplateCreateDialog folderId={parentId ?? undefined} />
-          )}
+          {/* If you delete this, delete the component as well. */}
+          {organisation.organisationClaim.flags.allowLegacyEnvelopes && <DocumentUploadButtonLegacy type={type} />}
 
           <FolderCreateDialog type={type} />
         </div>
@@ -113,7 +107,7 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
       {isPending ? (
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="border-border bg-card h-full rounded-lg border px-4 py-5">
+            <div key={index} className="h-full rounded-lg border border-border bg-card px-4 py-5">
               <div className="flex items-center gap-3">
                 <Skeleton className="h-8 w-8 rounded" />
                 <div className="flex w-full items-center justify-between">
@@ -155,8 +149,6 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
                       setFolderToMove(folder);
                       setIsMovingFolder(true);
                     }}
-                    onPin={(folderId) => void pinFolder({ folderId })}
-                    onUnpin={(folderId) => void unpinFolder({ folderId })}
                     onSettings={(folder) => {
                       setFolderToSettings(folder);
                       setIsSettingsFolderOpen(true);
@@ -180,8 +172,6 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
                       setFolderToMove(folder);
                       setIsMovingFolder(true);
                     }}
-                    onPin={(folderId) => void pinFolder({ folderId })}
-                    onUnpin={(folderId) => void unpinFolder({ folderId })}
                     onSettings={(folder) => {
                       setFolderToSettings(folder);
                       setIsSettingsFolderOpen(true);
@@ -195,13 +185,13 @@ export const FolderGrid = ({ type, parentId }: FolderGridProps) => {
               </div>
             )}
 
-            {foldersData.folders.length > 12 && (
+            {unpinnedFolders.length > 12 && (
               <div className="mt-2 flex items-center justify-center">
                 <Link
-                  className="text-muted-foreground hover:text-foreground text-sm font-medium"
+                  className="font-medium text-muted-foreground text-sm hover:text-foreground"
                   to={formatViewAllFoldersPath()}
                 >
-                  View all folders
+                  <Trans>View all folders</Trans>
                 </Link>
               </div>
             )}

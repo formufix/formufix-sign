@@ -1,28 +1,21 @@
-import { createElement } from 'react';
-
-import { msg } from '@lingui/core/macro';
-import { EnvelopeType } from '@prisma/client';
-
 import { mailer } from '@documenso/email/mailer';
 import { DocumentRecipientSignedEmailTemplate } from '@documenso/email/templates/document-recipient-signed';
 import { prisma } from '@documenso/prisma';
+import { msg } from '@lingui/core/macro';
+import { EnvelopeType } from '@prisma/client';
+import { createElement } from 'react';
 
 import { getI18nInstance } from '../../../client-only/providers/i18n-server';
 import { NEXT_PUBLIC_WEBAPP_URL } from '../../../constants/app';
 import { getEmailContext } from '../../../server-only/email/get-email-context';
 import { extractDerivedDocumentEmailSettings } from '../../../types/document-email';
 import { unsafeBuildEnvelopeIdQuery } from '../../../utils/envelope';
+import { isRecipientEmailValidForSending } from '../../../utils/recipients';
 import { renderEmailWithI18N } from '../../../utils/render-email-with-i18n';
 import type { JobRunIO } from '../../client/_internal/job';
 import type { TSendRecipientSignedEmailJobDefinition } from './send-recipient-signed-email';
 
-export const run = async ({
-  payload,
-  io,
-}: {
-  payload: TSendRecipientSignedEmailJobDefinition;
-  io: JobRunIO;
-}) => {
+export const run = async ({ payload, io }: { payload: TSendRecipientSignedEmailJobDefinition; io: JobRunIO }) => {
   const { documentId, recipientId } = payload;
 
   const envelope = await prisma.envelope.findFirst({
@@ -65,9 +58,7 @@ export const run = async ({
     throw new Error('Document has no recipients');
   }
 
-  const isRecipientSignedEmailEnabled = extractDerivedDocumentEmailSettings(
-    envelope.documentMeta,
-  ).recipientSigned;
+  const isRecipientSignedEmailEnabled = extractDerivedDocumentEmailSettings(envelope.documentMeta).recipientSigned;
 
   if (!isRecipientSignedEmailEnabled) {
     return;
@@ -79,8 +70,8 @@ export const run = async ({
 
   const recipientReference = recipientName || recipientEmail;
 
-  // Don't send notification if the owner is the one who signed
-  if (owner.email === recipientEmail) {
+  // Don't send notification if the owner is the one who signed.
+  if (owner.email === recipientEmail || !isRecipientEmailValidForSending(recipient)) {
     return;
   }
 

@@ -1,6 +1,5 @@
-import { EnvelopeType } from '@prisma/client';
-
 import { prisma } from '@documenso/prisma';
+import { EnvelopeType } from '@prisma/client';
 
 import { AppError, AppErrorCode } from '../../errors/app-error';
 import type { TDocumentAuthMethods } from '../../types/document-auth';
@@ -92,6 +91,11 @@ export const getDocumentAndSenderByToken = async ({
       },
       envelopeItems: {
         select: {
+          id: true,
+          title: true,
+          order: true,
+          envelopeId: true,
+          documentDataId: true,
           documentData: true,
         },
       },
@@ -99,6 +103,7 @@ export const getDocumentAndSenderByToken = async ({
         select: {
           name: true,
           teamEmail: true,
+          url: true,
           teamGlobalSettings: {
             select: {
               brandingEnabled: true,

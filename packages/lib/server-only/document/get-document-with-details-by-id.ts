@@ -9,11 +9,7 @@ export type GetDocumentWithDetailsByIdOptions = {
   teamId: number;
 };
 
-export const getDocumentWithDetailsById = async ({
-  id,
-  userId,
-  teamId,
-}: GetDocumentWithDetailsByIdOptions) => {
+export const getDocumentWithDetailsById = async ({ id, userId, teamId }: GetDocumentWithDetailsByIdOptions) => {
   const envelope = await getEnvelopeById({
     id,
     type: EnvelopeType.DOCUMENT,
@@ -32,6 +28,7 @@ export const getDocumentWithDetailsById = async ({
   return {
     ...envelope,
     envelopeId: envelope.id,
+    internalVersion: envelope.internalVersion,
     documentData: {
       ...firstDocumentData,
       envelopeItemId: envelope.envelopeItems[0].id,
@@ -62,5 +59,8 @@ export const getDocumentWithDetailsById = async ({
       documentId: legacyDocumentId,
       password: null,
     },
+    envelopeItems: envelope.envelopeItems.map((envelopeItem) => ({
+      ...envelopeItem,
+    })),
   };
 };

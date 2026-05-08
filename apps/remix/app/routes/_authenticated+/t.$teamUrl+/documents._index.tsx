@@ -1,12 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-
-import { Trans } from '@lingui/react/macro';
-import { FolderType, OrganisationType } from '@prisma/client';
-import { useParams, useSearchParams } from 'react-router';
-import { Link } from 'react-router';
-import { z } from 'zod';
-
+import { useSessionStorage } from '@documenso/lib/client-only/hooks/use-session-storage';
 import { useCurrentOrganisation } from '@documenso/lib/client-only/providers/organisation';
+import { STATS_COUNT_CAP } from '@documenso/lib/constants/document';
+import { SKIP_QUERY_BATCH_META } from '@documenso/lib/constants/trpc';
 import { formatAvatarUrl } from '@documenso/lib/utils/avatars';
 import { parseToIntegerArray } from '@documenso/lib/utils/params';
 import { formatDocumentsPath } from '@documenso/lib/utils/teams';
@@ -15,22 +10,32 @@ import { trpc } from '@documenso/trpc/react';
 import type { TFindDocumentsInternalResponse } from '@documenso/trpc/server/document-router/find-documents-internal.types';
 import { ZFindDocumentsInternalRequestSchema } from '@documenso/trpc/server/document-router/find-documents-internal.types';
 import { Avatar, AvatarFallback, AvatarImage } from '@documenso/ui/primitives/avatar';
+import type { RowSelectionState } from '@documenso/ui/primitives/data-table';
 import { Tabs, TabsList, TabsTrigger } from '@documenso/ui/primitives/tabs';
+import { msg } from '@lingui/core/macro';
+import { Trans } from '@lingui/react/macro';
+import { EnvelopeType, FolderType, OrganisationType } from '@prisma/client';
+import { useEffect, useMemo, useState } from 'react';
+import { Link, useParams, useSearchParams } from 'react-router';
+import { z } from 'zod';
 
 import { DocumentMoveToFolderDialog } from '~/components/dialogs/document-move-to-folder-dialog';
-import { DocumentDropZoneWrapper } from '~/components/general/document/document-drop-zone-wrapper';
+import { EnvelopesBulkDeleteDialog } from '~/components/dialogs/envelopes-bulk-delete-dialog';
+import { EnvelopesBulkMoveDialog } from '~/components/dialogs/envelopes-bulk-move-dialog';
 import { DocumentSearch } from '~/components/general/document/document-search';
 import { DocumentStatus } from '~/components/general/document/document-status';
+import { EnvelopeDropZoneWrapper } from '~/components/general/envelope/envelope-drop-zone-wrapper';
 import { FolderGrid } from '~/components/general/folder/folder-grid';
 import { PeriodSelector } from '~/components/general/period-selector';
 import { DocumentsTable } from '~/components/tables/documents-table';
 import { DocumentsTableEmptyState } from '~/components/tables/documents-table-empty-state';
 import { DocumentsTableSenderFilter } from '~/components/tables/documents-table-sender-filter';
+import { EnvelopesTableBulkActionBar } from '~/components/tables/envelopes-table-bulk-action-bar';
 import { useCurrentTeam } from '~/providers/team';
 import { appMetaTags } from '~/utils/meta';
 
 export function meta() {
-  return appMetaTags('Documents');
+  return appMetaTags(msg`Documents`);
 }
 
 const ZSearchParamsSchema = ZFindDocumentsInternalRequestSchema.pick({
@@ -53,6 +58,14 @@ export default function DocumentsPage() {
   const [isMovingDocument, setIsMovingDocument] = useState(false);
   const [documentToMove, setDocumentToMove] = useState<number | null>(null);
 
+  const [rowSelection, setRowSelection] = useSessionStorage<RowSelectionState>('documents-bulk-selection', {});
+  const [isBulkMoveDialogOpen, setIsBulkMoveDialogOpen] = useState(false);
+  const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
+
+  const selectedEnvelopeIds = useMemo(() => {
+    return Object.keys(rowSelection).filter((id) => rowSelection[id]);
+  }, [rowSelection]);
+
   const [stats, setStats] = useState<TFindDocumentsInternalResponse['stats']>({
     [ExtendedDocumentStatus.DRAFT]: 0,
     [ExtendedDocumentStatus.PENDING]: 0,
@@ -67,10 +80,15 @@ export default function DocumentsPage() {
     [searchParams],
   );
 
-  const { data, isLoading, isLoadingError } = trpc.document.findDocumentsInternal.useQuery({
-    ...findDocumentSearchParams,
-    folderId,
-  });
+  const { data, isLoading, isLoadingError } = trpc.document.findDocumentsInternal.useQuery(
+    {
+      ...findDocumentSearchParams,
+      folderId,
+    },
+    {
+      ...SKIP_QUERY_BATCH_META,
+    },
+  );
 
   const getTabHref = (value: keyof typeof ExtendedDocumentStatus) => {
     const params = new URLSearchParams(searchParams);
@@ -108,22 +126,19 @@ export default function DocumentsPage() {
     }
   }, [data?.stats]);
 
-  // Todo: Envelopes - Change the dropzone wrapper to create to V2 documents after we're ready.
   return (
-    <DocumentDropZoneWrapper>
+    <EnvelopeDropZoneWrapper type={EnvelopeType.DOCUMENT}>
       <div className="mx-auto w-full max-w-screen-xl px-4 md:px-8">
         <FolderGrid type={FolderType.DOCUMENT} parentId={folderId ?? null} />
 
         <div className="mt-8 flex flex-wrap items-center justify-between gap-x-4 gap-y-8">
           <div className="flex flex-row items-center">
-            <Avatar className="dark:border-border mr-3 h-12 w-12 border-2 border-solid border-white">
+            <Avatar className="mr-3 h-12 w-12 border-2 border-white border-solid dark:border-border">
               {team.avatarImageId && <AvatarImage src={formatAvatarUrl(team.avatarImageId)} />}
-              <AvatarFallback className="text-muted-foreground text-xs">
-                {team.name.slice(0, 1)}
-              </AvatarFallback>
+              <AvatarFallback className="text-muted-foreground text-xs">{team.name.slice(0, 1)}</AvatarFallback>
             </Avatar>
 
-            <h2 className="text-4xl font-semibold">
+            <h2 className="font-semibold text-4xl">
               <Trans>Documents</Trans>
             </h2>
           </div>
@@ -146,17 +161,14 @@ export default function DocumentsPage() {
                     return true;
                   })
                   .map((value) => (
-                    <TabsTrigger
-                      key={value}
-                      className="hover:text-foreground min-w-[60px]"
-                      value={value}
-                      asChild
-                    >
+                    <TabsTrigger key={value} className="min-w-[60px] hover:text-foreground" value={value} asChild>
                       <Link to={getTabHref(value)} preventScrollReset>
                         <DocumentStatus status={value} />
 
                         {value !== ExtendedDocumentStatus.ALL && (
-                          <span className="ml-1 inline-block opacity-50">{stats[value]}</span>
+                          <span className="ml-1 inline-block opacity-50">
+                            {stats[value] >= STATS_COUNT_CAP ? `${STATS_COUNT_CAP.toLocaleString()}+` : stats[value]}
+                          </span>
                         )}
                       </Link>
                     </TabsTrigger>
@@ -178,9 +190,7 @@ export default function DocumentsPage() {
         <div className="mt-8">
           <div>
             {data && data.count === 0 ? (
-              <DocumentsTableEmptyState
-                status={findDocumentSearchParams.status || ExtendedDocumentStatus.ALL}
-              />
+              <DocumentsTableEmptyState status={findDocumentSearchParams.status || ExtendedDocumentStatus.ALL} />
             ) : (
               <DocumentsTable
                 data={data}
@@ -190,6 +200,9 @@ export default function DocumentsPage() {
                   setDocumentToMove(documentId);
                   setIsMovingDocument(true);
                 }}
+                enableSelection
+                rowSelection={rowSelection}
+                onRowSelectionChange={setRowSelection}
               />
             )}
           </div>
@@ -209,7 +222,31 @@ export default function DocumentsPage() {
             }}
           />
         )}
+
+        <EnvelopesTableBulkActionBar
+          selectedCount={selectedEnvelopeIds.length}
+          onMoveClick={() => setIsBulkMoveDialogOpen(true)}
+          onDeleteClick={() => setIsBulkDeleteDialogOpen(true)}
+          onClearSelection={() => setRowSelection({})}
+        />
+
+        <EnvelopesBulkMoveDialog
+          envelopeIds={selectedEnvelopeIds}
+          envelopeType={EnvelopeType.DOCUMENT}
+          open={isBulkMoveDialogOpen}
+          currentFolderId={folderId}
+          onOpenChange={setIsBulkMoveDialogOpen}
+          onSuccess={() => setRowSelection({})}
+        />
+
+        <EnvelopesBulkDeleteDialog
+          envelopeIds={selectedEnvelopeIds}
+          envelopeType={EnvelopeType.DOCUMENT}
+          open={isBulkDeleteDialogOpen}
+          onOpenChange={setIsBulkDeleteDialogOpen}
+          onSuccess={() => setRowSelection({})}
+        />
       </div>
-    </DocumentDropZoneWrapper>
+    </EnvelopeDropZoneWrapper>
   );
 }

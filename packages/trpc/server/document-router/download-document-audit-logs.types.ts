@@ -5,12 +5,9 @@ export const ZDownloadDocumentAuditLogsRequestSchema = z.object({
 });
 
 export const ZDownloadDocumentAuditLogsResponseSchema = z.object({
-  url: z.string(),
+  data: z.string(),
+  envelopeTitle: z.string(),
 });
 
-export type TDownloadDocumentAuditLogsRequest = z.infer<
-  typeof ZDownloadDocumentAuditLogsRequestSchema
->;
-export type TDownloadDocumentAuditLogsResponse = z.infer<
-  typeof ZDownloadDocumentAuditLogsResponseSchema
->;
+export type TDownloadDocumentAuditLogsRequest = z.infer<typeof ZDownloadDocumentAuditLogsRequestSchema>;
+export type TDownloadDocumentAuditLogsResponse = z.infer<typeof ZDownloadDocumentAuditLogsResponseSchema>;

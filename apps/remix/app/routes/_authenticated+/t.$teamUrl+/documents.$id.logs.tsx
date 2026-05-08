@@ -1,3 +1,10 @@
+import { getSession } from '@documenso/auth/server/lib/utils/get-session';
+import { getEnvelopeById } from '@documenso/lib/server-only/envelope/get-envelope-by-id';
+import { getTeamByUrl } from '@documenso/lib/server-only/team/get-team';
+import { mapSecondaryIdToDocumentId } from '@documenso/lib/utils/envelope';
+import { logDocumentAccess } from '@documenso/lib/utils/logger';
+import { formatDocumentsPath } from '@documenso/lib/utils/teams';
+import { Card } from '@documenso/ui/primitives/card';
 import type { MessageDescriptor } from '@lingui/core';
 import { msg } from '@lingui/core/macro';
 import { useLingui } from '@lingui/react';
@@ -6,14 +13,6 @@ import { EnvelopeType, type Recipient } from '@prisma/client';
 import { ChevronLeft } from 'lucide-react';
 import { DateTime } from 'luxon';
 import { Link } from 'react-router';
-
-import { getSession } from '@documenso/auth/server/lib/utils/get-session';
-import { getEnvelopeById } from '@documenso/lib/server-only/envelope/get-envelope-by-id';
-import { getTeamByUrl } from '@documenso/lib/server-only/team/get-team';
-import { mapSecondaryIdToDocumentId } from '@documenso/lib/utils/envelope';
-import { logDocumentAccess } from '@documenso/lib/utils/logger';
-import { formatDocumentsPath } from '@documenso/lib/utils/teams';
-import { Card } from '@documenso/ui/primitives/card';
 
 import { DocumentAuditLogDownloadButton } from '~/components/general/document/document-audit-log-download-button';
 import { DocumentCertificateDownloadButton } from '~/components/general/document/document-certificate-download-button';
@@ -75,11 +74,12 @@ export async function loader({ params, request }: Route.LoaderArgs) {
     },
     recipients: envelope.recipients,
     documentRootPath,
+    userId: user.id,
   };
 }
 
 export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) {
-  const { document, recipients, documentRootPath } = loaderData;
+  const { document, recipients, documentRootPath, userId } = loaderData;
 
   const { _, i18n } = useLingui();
 
@@ -98,9 +98,7 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
     },
     {
       description: msg`Created by`,
-      value: document.user.name
-        ? `${document.user.name} (${document.user.email})`
-        : document.user.email,
+      value: document.user.name ? `${document.user.name} (${document.user.email})` : document.user.email,
     },
     {
       description: msg`Date created`,
@@ -133,7 +131,7 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
     <div className="mx-auto -mt-4 w-full max-w-screen-xl px-4 md:px-8">
       <Link
         to={`${documentRootPath}/${document.envelopeId}`}
-        className="flex items-center text-[#7AC455] hover:opacity-80"
+        className="flex items-center text-documenso-700 hover:opacity-80"
       >
         <ChevronLeft className="mr-2 inline-block h-5 w-5" />
         <Trans>Document</Trans>
@@ -142,7 +140,7 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
       <div className="flex flex-col">
         <div>
           <h1
-            className="mt-4 block max-w-[20rem] truncate text-2xl font-semibold md:max-w-[30rem] md:text-3xl"
+            className="mt-4 block max-w-[20rem] truncate font-semibold text-2xl md:max-w-[30rem] md:text-3xl"
             title={document.title}
           >
             {document.title}
@@ -150,11 +148,7 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
         </div>
         <div className="mt-1 flex flex-col justify-between sm:flex-row">
           <div className="mt-2.5 flex items-center gap-x-6">
-            <DocumentStatusComponent
-              inheritColor
-              status={document.status}
-              className="text-muted-foreground"
-            />
+            <DocumentStatusComponent inheritColor status={document.status} className="text-muted-foreground" />
           </div>
           <div className="mt-4 flex w-full flex-row sm:mt-0 sm:w-auto sm:self-end">
             <DocumentCertificateDownloadButton
@@ -173,13 +167,15 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
           {documentInformation.map((info, i) => (
             <div className="text-foreground text-sm" key={i}>
               <h3 className="font-semibold">{_(info.description)}</h3>
-              <p className="text-muted-foreground truncate">{info.value}</p>
+              <p className="truncate text-muted-foreground">{info.value}</p>
             </div>
           ))}
 
           <div className="text-foreground text-sm">
-            <h3 className="font-semibold">Recipients</h3>
-            <ul className="text-muted-foreground list-inside list-disc">
+            <h3 className="font-semibold">
+              <Trans>Recipients</Trans>
+            </h3>
+            <ul className="list-inside list-disc text-muted-foreground">
               {recipients.map((recipient) => (
                 <li key={`recipient-${recipient.id}`}>
                   <span>{formatRecipientText(recipient)}</span>
@@ -191,7 +187,7 @@ export default function DocumentsLogsPage({ loaderData }: Route.ComponentProps) 
       </section>
 
       <section className="mt-6">
-        <DocumentLogsTable documentId={document.id} />
+        <DocumentLogsTable documentId={document.id} userId={userId} />
       </section>
     </div>
   );

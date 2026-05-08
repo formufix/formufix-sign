@@ -12,11 +12,13 @@ export type CreateEmbeddingPresignTokenOptions = {
    * In development mode, can be set to 0 to create a token that expires immediately (for testing)
    */
   expiresIn?: number;
+  scope?: string;
 };
 
 export const createEmbeddingPresignToken = async ({
   apiToken,
   expiresIn,
+  scope,
 }: CreateEmbeddingPresignTokenOptions) => {
   try {
     // Validate the API token
@@ -30,8 +32,7 @@ export const createEmbeddingPresignToken = async ({
     const minExpirationMinutes = isDevelopment ? 0 : 5;
 
     // Ensure expiresIn is at least the minimum allowed value
-    const effectiveExpiresIn =
-      expiresIn !== undefined && expiresIn >= minExpirationMinutes ? expiresIn : 60; // Default to 1 hour if not specified or below minimum
+    const effectiveExpiresIn = expiresIn !== undefined && expiresIn >= minExpirationMinutes ? expiresIn : 60; // Default to 1 hour if not specified or below minimum
 
     const expiresAt = now.plus({ minutes: effectiveExpiresIn });
 
@@ -40,6 +41,7 @@ export const createEmbeddingPresignToken = async ({
     const token = await new SignJWT({
       aud: String(validatedToken.teamId ?? validatedToken.userId),
       sub: String(validatedToken.id),
+      scope,
     })
       .setProtectedHeader({ alg: 'HS256' })
       .setIssuedAt(now.toJSDate())

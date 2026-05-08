@@ -1,5 +1,3 @@
-import { DocumentDataType, EnvelopeType } from '@prisma/client';
-
 import { getServerLimits } from '@documenso/ee/server-only/limits/server';
 import { AppError, AppErrorCode } from '@documenso/lib/errors/app-error';
 import { createDocumentData } from '@documenso/lib/server-only/document-data/create-document-data';
@@ -7,12 +5,13 @@ import { createEnvelope } from '@documenso/lib/server-only/envelope/create-envel
 import { getPresignPostUrl } from '@documenso/lib/universal/upload/server-actions';
 import { mapSecondaryIdToDocumentId } from '@documenso/lib/utils/envelope';
 import { prisma } from '@documenso/prisma';
+import { DocumentDataType, EnvelopeType } from '@prisma/client';
 
 import { authenticatedProcedure } from '../trpc';
 import {
+  createDocumentTemporaryMeta,
   ZCreateDocumentTemporaryRequestSchema,
   ZCreateDocumentTemporaryResponseSchema,
-  createDocumentTemporaryMeta,
 } from './create-document-temporary.types';
 
 /**
@@ -37,6 +36,8 @@ export const createDocumentTemporaryRoute = authenticatedProcedure
       recipients,
       meta,
       folderId,
+      attachments,
+      formValues,
     } = input;
 
     const { remaining } = await getServerLimits({ userId: user.id, teamId });
@@ -67,6 +68,7 @@ export const createDocumentTemporaryRoute = authenticatedProcedure
         title,
         externalId,
         visibility,
+        formValues,
         globalAccessAuth,
         globalActionAuth,
         recipients: (recipients || []).map((recipient) => ({
@@ -82,11 +84,16 @@ export const createDocumentTemporaryRoute = authenticatedProcedure
         folderId,
         envelopeItems: [
           {
+            // If you ever allow more than 1 in this endpoint, make sure to use `maximumEnvelopeItemCount` to limit it.
             documentDataId: documentData.id,
           },
         ],
       },
-      meta,
+      attachments,
+      meta: {
+        ...meta,
+        emailSettings: meta?.emailSettings ?? undefined,
+      },
       requestMetadata: ctx.metadata,
     });
 

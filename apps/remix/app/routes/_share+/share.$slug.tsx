@@ -1,7 +1,6 @@
-import { redirect, useLoaderData } from 'react-router';
-
 import { NEXT_PUBLIC_WEBAPP_URL } from '@documenso/lib/constants/app';
 import { getDocumentByAccessToken } from '@documenso/lib/server-only/document/get-document-by-access-token';
+import { redirect, useLoaderData } from 'react-router';
 
 import { DocumentCertificateQRView } from '~/components/general/document/document-certificate-qr-view';
 
@@ -60,6 +59,7 @@ export const loader = async ({ request, params: { slug } }: Route.LoaderArgs) =>
 
     return {
       document,
+      token: slug,
     };
   }
 
@@ -74,7 +74,7 @@ export const loader = async ({ request, params: { slug } }: Route.LoaderArgs) =>
 };
 
 export default function SharePage() {
-  const { document } = useLoaderData<typeof loader>();
+  const { document, token } = useLoaderData<typeof loader>();
 
   if (document) {
     return (
@@ -86,6 +86,7 @@ export default function SharePage() {
         envelopeItems={document.envelopeItems}
         recipientCount={document.recipientCount}
         completedDate={document.completedAt ?? undefined}
+        token={token}
       />
     );
   }

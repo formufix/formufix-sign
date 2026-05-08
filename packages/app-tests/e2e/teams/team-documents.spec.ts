@@ -1,17 +1,12 @@
+import { seedBlankDocument, seedDocuments, seedTeamDocuments } from '@documenso/prisma/seed/documents';
+import { seedTeam, seedTeamEmail, seedTeamMember } from '@documenso/prisma/seed/teams';
+import { seedUser } from '@documenso/prisma/seed/users';
 import { expect, test } from '@playwright/test';
 import { DocumentStatus, DocumentVisibility, TeamMemberRole } from '@prisma/client';
 
-import {
-  seedBlankDocument,
-  seedDocuments,
-  seedTeamDocuments,
-} from '@documenso/prisma/seed/documents';
-import { seedTeam, seedTeamEmail, seedTeamMember } from '@documenso/prisma/seed/teams';
-import { seedUser } from '@documenso/prisma/seed/users';
-
 import { apiSignin, apiSignout } from '../fixtures/authentication';
 import { checkDocumentTabCount } from '../fixtures/documents';
-import { expectTextToBeVisible } from '../fixtures/generic';
+import { expectTextToBeVisible, expectToastTextToBeVisible, openDropdownMenu } from '../fixtures/generic';
 
 test('[TEAMS]: check team documents count', async ({ page }) => {
   const { team, teamOwner, teamMember2 } = await seedTeamDocuments();
@@ -49,11 +44,7 @@ test('[TEAMS]: check team documents count', async ({ page }) => {
 
 test('[TEAMS]: check team documents count with internal team email', async ({ page }) => {
   const { team, teamOwner, teamMember2, teamMember4 } = await seedTeamDocuments();
-  const {
-    team: team2,
-    teamOwner: team2Owner,
-    teamMember2: team2Member2,
-  } = await seedTeamDocuments();
+  const { team: team2, teamOwner: team2Owner, teamMember2: team2Member2 } = await seedTeamDocuments();
 
   const teamEmailMember = teamMember4;
 
@@ -239,21 +230,15 @@ test('[TEAMS]: resend pending team document', async ({ page }) => {
     redirectPath: `/t/${team.url}/documents?status=PENDING`,
   });
 
-  await expect(async () => {
-    await page.getByTestId('document-table-action-btn').first().click();
-
-    await page.waitForTimeout(1000);
-
-    await expect(page.getByRole('menuitem', { name: 'Resend' })).toBeVisible();
-  }).toPass();
-
-  await page.getByRole('menuitem').filter({ hasText: 'Resend' }).click();
+  const actionBtn = page.getByTestId('document-table-action-btn').first();
+  await expect(actionBtn).toBeAttached();
+  await openDropdownMenu(page, actionBtn);
+  await expect(page.getByRole('menuitem', { name: 'Resend' })).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Resend' }).click();
   await page.getByLabel('test.documenso.com').first().click();
   await page.getByRole('button', { name: 'Send reminder' }).click();
 
-  await expect(
-    page.getByRole('status').filter({ hasText: 'Document re-sent' }).first(),
-  ).toBeVisible();
+  await expectToastTextToBeVisible(page, 'Document re-sent');
 });
 
 test('[TEAMS]: delete draft team document', async ({ page }) => {
@@ -265,14 +250,12 @@ test('[TEAMS]: delete draft team document', async ({ page }) => {
     redirectPath: `/t/${team.url}/documents?status=DRAFT`,
   });
 
-  await expect(async () => {
-    await page.getByTestId('document-table-action-btn').first().click();
-
-    await page.waitForTimeout(1000);
-
-    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
-  }).toPass();
-
+  const actionBtn = page.getByTestId('document-table-action-btn').first();
+  await expect(actionBtn).toBeVisible({
+    timeout: 500,
+  });
+  await openDropdownMenu(page, actionBtn);
+  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Delete' }).click();
   await page.getByRole('button', { name: 'Delete' }).click();
 
@@ -309,14 +292,12 @@ test('[TEAMS]: delete pending team document', async ({ page }) => {
     redirectPath: `/t/${team.url}/documents?status=PENDING`,
   });
 
-  await expect(async () => {
-    await page.getByTestId('document-table-action-btn').first().click();
-
-    await page.waitForTimeout(1000);
-
-    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
-  }).toPass();
-
+  const actionBtn = page.getByTestId('document-table-action-btn').first();
+  await expect(actionBtn).toBeVisible({
+    timeout: 500,
+  });
+  await openDropdownMenu(page, actionBtn);
+  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Delete' }).click({ force: true });
   await page.getByPlaceholder("Type 'delete' to confirm").fill('delete');
   await page.getByRole('button', { name: 'Delete' }).click({ force: true });
@@ -354,14 +335,12 @@ test('[TEAMS]: delete completed team document', async ({ page }) => {
     redirectPath: `/t/${team.url}/documents?status=COMPLETED`,
   });
 
-  await expect(async () => {
-    await page.getByTestId('document-table-action-btn').first().click();
-
-    await page.waitForTimeout(1000);
-
-    await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
-  }).toPass();
-
+  const actionBtn = page.getByTestId('document-table-action-btn').first();
+  await expect(actionBtn).toBeVisible({
+    timeout: 500,
+  });
+  await openDropdownMenu(page, actionBtn);
+  await expect(page.getByRole('menuitem', { name: 'Delete' })).toBeVisible();
   await page.getByRole('menuitem', { name: 'Delete' }).click({ force: true });
   await page.getByPlaceholder("Type 'delete' to confirm").fill('delete');
   await page.getByRole('button', { name: 'Delete' }).click({ force: true });
@@ -507,9 +486,7 @@ test('[TEAMS]: check document visibility based on team member role', async ({ pa
   await expectTextToBeVisible(page, 'Document Visible to Admin with Recipient');
 });
 
-test('[TEAMS]: ensure document owner can see document regardless of visibility', async ({
-  page,
-}) => {
+test('[TEAMS]: ensure document owner can see document regardless of visibility', async ({ page }) => {
   const { team, owner } = await seedTeam();
 
   // Seed a member user
@@ -576,9 +553,7 @@ test('[TEAMS]: ensure recipient can see document regardless of visibility', asyn
   });
 
   // Check that the member user can see the document
-  await expect(
-    page.getByRole('link', { name: 'Admin Document with Member Recipient', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Admin Document with Member Recipient', exact: true })).toBeVisible();
 
   await apiSignout({ page });
 });
@@ -613,16 +588,12 @@ test('[TEAMS]: check that MEMBER role cannot see ADMIN-only documents', async ({
   });
 
   // Check that the member user cannot see the ADMIN-only document
-  await expect(
-    page.getByRole('link', { name: 'Admin Only Document', exact: true }),
-  ).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Admin Only Document', exact: true })).not.toBeVisible();
 
   await apiSignout({ page });
 });
 
-test('[TEAMS]: check that MEMBER role cannot see MANAGER_AND_ABOVE-only documents', async ({
-  page,
-}) => {
+test('[TEAMS]: check that MEMBER role cannot see MANAGER_AND_ABOVE-only documents', async ({ page }) => {
   const { team, owner } = await seedTeam();
 
   // Seed a member user
@@ -652,9 +623,7 @@ test('[TEAMS]: check that MEMBER role cannot see MANAGER_AND_ABOVE-only document
   });
 
   // Check that the member user cannot see the ADMIN-only document
-  await expect(
-    page.getByRole('link', { name: 'Admin Only Document', exact: true }),
-  ).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Admin Only Document', exact: true })).not.toBeVisible();
 
   await apiSignout({ page });
 });
@@ -689,9 +658,7 @@ test('[TEAMS]: check that MANAGER role cannot see ADMIN-only documents', async (
   });
 
   // Check that the manager user cannot see the ADMIN-only document
-  await expect(
-    page.getByRole('link', { name: 'Admin Only Document', exact: true }),
-  ).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Admin Only Document', exact: true })).not.toBeVisible();
 
   await apiSignout({ page });
 });
@@ -726,9 +693,7 @@ test('[TEAMS]: check that ADMIN role can see MANAGER_AND_ABOVE documents', async
   });
 
   // Check that the admin user can see the MANAGER_AND_ABOVE document
-  await expect(
-    page.getByRole('link', { name: 'Manager and Above Document', exact: true }),
-  ).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Manager and Above Document', exact: true })).toBeVisible();
 
   await apiSignout({ page });
 });
@@ -765,9 +730,7 @@ test('[TEAMS]: check that ADMIN role can change document visibility', async ({ p
   await expect(page.getByTestId('documentVisibilitySelectValue')).toContainText('Admins only');
 });
 
-test('[TEAMS]: check that MEMBER role cannot change visibility of EVERYONE documents', async ({
-  page,
-}) => {
+test('[TEAMS]: check that MEMBER role cannot change visibility of EVERYONE documents', async ({ page }) => {
   const { team, owner } = await seedTeam();
 
   const teamMember = await seedTeamMember({
@@ -791,9 +754,7 @@ test('[TEAMS]: check that MEMBER role cannot change visibility of EVERYONE docum
   await expect(page.getByTestId('documentVisibilitySelectValue')).toBeDisabled();
 });
 
-test('[TEAMS]: check that MEMBER role cannot change visibility of MANAGER_AND_ABOVE documents', async ({
-  page,
-}) => {
+test('[TEAMS]: check that MEMBER role cannot change visibility of MANAGER_AND_ABOVE documents', async ({ page }) => {
   const { team, owner } = await seedTeam();
 
   const teamMember = await seedTeamMember({
@@ -817,9 +778,7 @@ test('[TEAMS]: check that MEMBER role cannot change visibility of MANAGER_AND_AB
   await expect(page.getByTestId('documentVisibilitySelectValue')).toBeDisabled();
 });
 
-test('[TEAMS]: check that MEMBER role cannot change visibility of ADMIN documents', async ({
-  page,
-}) => {
+test('[TEAMS]: check that MEMBER role cannot change visibility of ADMIN documents', async ({ page }) => {
   const { team, owner } = await seedTeam();
 
   const teamMember = await seedTeamMember({
@@ -843,9 +802,7 @@ test('[TEAMS]: check that MEMBER role cannot change visibility of ADMIN document
   await expect(page.getByTestId('documentVisibilitySelectValue')).toBeDisabled();
 });
 
-test('[TEAMS]: check that MANAGER role cannot change visibility of ADMIN documents', async ({
-  page,
-}) => {
+test('[TEAMS]: check that MANAGER role cannot change visibility of ADMIN documents', async ({ page }) => {
   const { team, owner } = await seedTeam();
 
   const teamManager = await seedTeamMember({
@@ -871,16 +828,8 @@ test('[TEAMS]: check that MANAGER role cannot change visibility of ADMIN documen
 
 test('[TEAMS]: users cannot see documents from other teams', async ({ page }) => {
   // Seed two teams with documents
-  const {
-    team: teamA,
-    teamOwner: teamAOwner,
-    teamMember2: teamAMember,
-  } = await seedTeamDocuments();
-  const {
-    team: teamB,
-    teamOwner: teamBOwner,
-    teamMember2: teamBMember,
-  } = await seedTeamDocuments();
+  const { team: teamA, teamOwner: teamAOwner, teamMember2: teamAMember } = await seedTeamDocuments();
+  const { team: teamB, teamOwner: teamBOwner, teamMember2: teamBMember } = await seedTeamDocuments();
 
   // Seed a document in team B
   await seedDocuments([
@@ -936,9 +885,7 @@ test('[TEAMS]: personal documents are not visible in team context', async ({ pag
   });
 
   // Verify that the personal document is not visible in the team context
-  await expect(
-    page.getByRole('link', { name: 'Personal Document', exact: true }),
-  ).not.toBeVisible();
+  await expect(page.getByRole('link', { name: 'Personal Document', exact: true })).not.toBeVisible();
 
   await apiSignout({ page });
 });

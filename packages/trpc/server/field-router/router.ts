@@ -1,5 +1,3 @@
-import { EnvelopeType } from '@prisma/client';
-
 import { createEnvelopeFields } from '@documenso/lib/server-only/field/create-envelope-fields';
 import { deleteDocumentField } from '@documenso/lib/server-only/field/delete-document-field';
 import { deleteTemplateField } from '@documenso/lib/server-only/field/delete-template-field';
@@ -8,10 +6,10 @@ import { removeSignedFieldWithToken } from '@documenso/lib/server-only/field/rem
 import { setFieldsForDocument } from '@documenso/lib/server-only/field/set-fields-for-document';
 import { setFieldsForTemplate } from '@documenso/lib/server-only/field/set-fields-for-template';
 import { signFieldWithToken } from '@documenso/lib/server-only/field/sign-field-with-token';
-import { updateDocumentFields } from '@documenso/lib/server-only/field/update-document-fields';
-import { updateTemplateFields } from '@documenso/lib/server-only/field/update-template-fields';
+import { updateEnvelopeFields } from '@documenso/lib/server-only/field/update-envelope-fields';
+import { EnvelopeType } from '@prisma/client';
 
-import { ZGenericSuccessResponse, ZSuccessResponseSchema } from '../document-router/schema';
+import { ZGenericSuccessResponse, ZSuccessResponseSchema } from '../schema';
 import { authenticatedProcedure, procedure, router } from '../trpc';
 import {
   ZCreateDocumentFieldRequestSchema,
@@ -109,7 +107,14 @@ export const fieldRouter = router({
           type: 'documentId',
           id: documentId,
         },
-        fields: [field],
+        fields: [
+          {
+            ...field,
+            page: field.pageNumber,
+            positionX: field.pageX,
+            positionY: field.pageY,
+          },
+        ],
         requestMetadata: ctx.metadata,
       });
 
@@ -148,7 +153,12 @@ export const fieldRouter = router({
           type: 'documentId',
           id: documentId,
         },
-        fields,
+        fields: fields.map((field) => ({
+          ...field,
+          page: field.pageNumber,
+          positionX: field.pageX,
+          positionY: field.pageY,
+        })),
         requestMetadata: ctx.metadata,
       });
     }),
@@ -178,10 +188,14 @@ export const fieldRouter = router({
         },
       });
 
-      const updatedFields = await updateDocumentFields({
+      const updatedFields = await updateEnvelopeFields({
         userId: ctx.user.id,
         teamId,
-        documentId,
+        id: {
+          type: 'documentId',
+          id: documentId,
+        },
+        type: EnvelopeType.DOCUMENT,
         fields: [field],
         requestMetadata: ctx.metadata,
       });
@@ -214,10 +228,14 @@ export const fieldRouter = router({
         },
       });
 
-      return await updateDocumentFields({
+      return await updateEnvelopeFields({
         userId: ctx.user.id,
         teamId,
-        documentId,
+        id: {
+          type: 'documentId',
+          id: documentId,
+        },
+        type: EnvelopeType.DOCUMENT,
         fields,
         requestMetadata: ctx.metadata,
       });
@@ -328,7 +346,14 @@ export const fieldRouter = router({
           type: 'templateId',
           id: templateId,
         },
-        fields: [field],
+        fields: [
+          {
+            ...field,
+            page: field.pageNumber,
+            positionX: field.pageX,
+            positionY: field.pageY,
+          },
+        ],
         requestMetadata: ctx.metadata,
       });
 
@@ -401,7 +426,12 @@ export const fieldRouter = router({
           type: 'templateId',
           id: templateId,
         },
-        fields,
+        fields: fields.map((field) => ({
+          ...field,
+          page: field.pageNumber,
+          positionX: field.pageX,
+          positionY: field.pageY,
+        })),
         requestMetadata: ctx.metadata,
       });
     }),
@@ -431,11 +461,16 @@ export const fieldRouter = router({
         },
       });
 
-      const updatedFields = await updateTemplateFields({
+      const updatedFields = await updateEnvelopeFields({
         userId: ctx.user.id,
         teamId,
-        templateId,
+        id: {
+          type: 'templateId',
+          id: templateId,
+        },
+        type: EnvelopeType.TEMPLATE,
         fields: [field],
+        requestMetadata: ctx.metadata,
       });
 
       return updatedFields.fields[0];
@@ -466,11 +501,16 @@ export const fieldRouter = router({
         },
       });
 
-      return await updateTemplateFields({
+      return await updateEnvelopeFields({
         userId: ctx.user.id,
         teamId,
-        templateId,
+        id: {
+          type: 'templateId',
+          id: templateId,
+        },
+        type: EnvelopeType.TEMPLATE,
         fields,
+        requestMetadata: ctx.metadata,
       });
     }),
 
@@ -548,27 +588,25 @@ export const fieldRouter = router({
   /**
    * @private
    */
-  signFieldWithToken: procedure
-    .input(ZSignFieldWithTokenMutationSchema)
-    .mutation(async ({ input, ctx }) => {
-      const { token, fieldId, value, isBase64, authOptions } = input;
+  signFieldWithToken: procedure.input(ZSignFieldWithTokenMutationSchema).mutation(async ({ input, ctx }) => {
+    const { token, fieldId, value, isBase64, authOptions } = input;
 
-      ctx.logger.info({
-        input: {
-          fieldId,
-        },
-      });
-
-      return await signFieldWithToken({
-        token,
+    ctx.logger.info({
+      input: {
         fieldId,
-        value: value ?? '',
-        isBase64,
-        userId: ctx.user?.id,
-        authOptions,
-        requestMetadata: ctx.metadata.requestMetadata,
-      });
-    }),
+      },
+    });
+
+    return await signFieldWithToken({
+      token,
+      fieldId,
+      value: value ?? '',
+      isBase64,
+      userId: ctx.user?.id,
+      authOptions,
+      requestMetadata: ctx.metadata.requestMetadata,
+    });
+  }),
 
   /**
    * @private
