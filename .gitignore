@@ -30,6 +30,7 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+.env.coolify
 
 # turbo
 .turbo
@@ -74,3 +75,4 @@ tmp/
 
 # opencode
 .opencode/package-lock.json
+.env.production
