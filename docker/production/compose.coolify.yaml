@@ -66,10 +66,33 @@ services:
       - NEXT_PRIVATE_SIGNING_PASSPHRASE=${NEXT_PRIVATE_SIGNING_PASSPHRASE}
       - NEXT_PUBLIC_USE_INTERNAL_URL_BROWSERLESS=${NEXT_PUBLIC_USE_INTERNAL_URL_BROWSERLESS}
       - DOCUMENSO_BOOTSTRAP_SECRET=${DOCUMENSO_BOOTSTRAP_SECRET}
-    ports:
-      - ${PORT:-3000}:${PORT:-3000}
+    # No published port and no Coolify domain: sign.fixos.de reaches Documenso only
+    # through the cloudflared tunnel below, so the VM takes no direct connections.
+    expose:
+      - ${PORT:-3000}
     volumes:
       - /opt/documenso/cert.p12:/opt/documenso/cert.p12:ro
+
+  # Remote-managed Cloudflare tunnel "sign.fixos.de", route sign.fixos.de ->
+  # http://documenso:3000. The host stays public: signers open their links without an
+  # account, and Documenso's own login guards the rest.
+  cloudflared:
+    image: 'cloudflare/cloudflared:latest'
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN:?err}
+      # The metrics server serves /ready; loopback only, nothing outside the container needs it.
+      - TUNNEL_METRICS=127.0.0.1:2000
+    healthcheck:
+      # Exits 0 only while the connector holds a live connection to Cloudflare.
+      test: ['CMD', 'cloudflared', 'tunnel', 'ready']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      - documenso
 
 volumes:
   database:
